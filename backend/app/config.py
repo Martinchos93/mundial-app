@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,6 +9,14 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str = "postgresql://user:pass@localhost:5432/mundial2026"
     REDIS_URL: str = "redis://localhost:6379"
+
+    @field_validator("DATABASE_URL")
+    @classmethod
+    def _normalize_db_url(cls, v: str) -> str:
+        # Railway/Heroku hand out postgres://; SQLAlchemy 2.0 needs postgresql://
+        if v.startswith("postgres://"):
+            return "postgresql://" + v[len("postgres://"):]
+        return v
 
     FOOTBALL_API_KEY: str = ""
     FOOTBALL_API_HOST: str = "v3.football.api-sports.io"

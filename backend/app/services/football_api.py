@@ -126,3 +126,12 @@ async def get_head_to_head(team1: int, team2: int, last: int = 5) -> list[dict]:
 async def get_player(player_id: int, season: int) -> dict | None:
     data = await _get("/players", {"id": player_id, "season": season}, ttl=3600)
     return data[0] if data else None
+
+
+async def search_team(name: str) -> list[dict]:
+    return await _get("/teams", {"search": name}, ttl=604800)  # 7 days
+
+
+async def get_squad(team_id: int) -> list[dict]:
+    """API-Football /players/squads → [{team, players:[{id,name,age,number,position,photo}]}]."""
+    return await _get("/players/squads", {"team": team_id}, ttl=604800)

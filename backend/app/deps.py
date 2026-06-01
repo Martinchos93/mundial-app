@@ -1,7 +1,6 @@
 from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.database import get_db
 from app.models import User
 from app.security import decode_access_token
@@ -35,6 +34,7 @@ def get_optional_user(
     return db.get(User, user_id)
 
 
-def require_admin_token(x_admin_token: str | None = Header(default=None)) -> None:
-    if not x_admin_token or x_admin_token != settings.ADMIN_TOKEN:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid admin token")
+def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
+    if not current_user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+    return current_user

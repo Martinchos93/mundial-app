@@ -5,14 +5,19 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Group, User, Prediction, Score, Match
+from app.models import Group, User, Prediction, Score, Match, Membership
 from app.schemas.group import Leaderboard, LeaderboardEntry
 
 router = APIRouter(prefix="/groups", tags=["leaderboard"])
 
 
 def _build_leaderboard(db: Session, group_id: int, only_today: bool) -> list[LeaderboardEntry]:
-    users = db.query(User).filter(User.group_id == group_id).all()
+    users = (
+        db.query(User)
+        .join(Membership, Membership.user_id == User.id)
+        .filter(Membership.group_id == group_id, Membership.status == "active")
+        .all()
+    )
     if not users:
         return []
 
@@ -33,7 +38,7 @@ def _build_leaderboard(db: Session, group_id: int, only_today: bool) -> list[Lea
     entries = [
         LeaderboardEntry(
             user_id=u.id,
-            name=u.name,
+            name=u.display_name,
             avatar_emoji=u.avatar_emoji,
             points=points_by_user.get(u.id, 0),
         )

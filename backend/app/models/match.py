@@ -13,6 +13,12 @@ class Match(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     api_id: Mapped[int | None] = mapped_column(Integer, unique=True, index=True, nullable=True)
 
+    # FIFA match number (1-104). Knockout matches reference earlier matches by
+    # this number via home_source/away_source (e.g. "MW:73" = winner of M73).
+    match_no: Mapped[int | None] = mapped_column(Integer, unique=True, index=True, nullable=True)
+    home_source: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    away_source: Mapped[str | None] = mapped_column(String(40), nullable=True)
+
     home_team: Mapped[str] = mapped_column(String(120), nullable=False)
     away_team: Mapped[str] = mapped_column(String(120), nullable=False)
     home_team_id: Mapped[int | None] = mapped_column(Integer, nullable=True)

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Calendar, Trophy, Users, BarChart2, Settings, type LucideIcon } from "lucide-react";
+import { Newspaper, Calendar, Trophy, Users, BarChart2, Settings, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Tab {
@@ -12,6 +12,7 @@ interface Tab {
 }
 
 const TABS: Tab[] = [
+  { href: "/news", label: "News", icon: Newspaper },
   { href: "/fixture", label: "Fixture", icon: Calendar },
   { href: "/prode", label: "Prode", icon: Trophy },
   { href: "/grupos", label: "Grupos", icon: Users },
@@ -24,7 +25,7 @@ export default function Navbar() {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white">
-      <div className="mx-auto grid max-w-lg grid-cols-5">
+      <div className="mx-auto grid max-w-lg grid-cols-6">
         {TABS.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(`${href}/`);
           return (

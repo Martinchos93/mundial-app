@@ -5,7 +5,7 @@ import { isToday, parseISO } from "date-fns";
 import { Bell } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import MatchCard from "@/components/match/MatchCard";
-import { useMatches, usePredictions } from "@/lib/api";
+import { useMatches, usePredictions, useNews } from "@/lib/api";
 import { cn, formatMatchDate, groupMatchesByDay, timezoneLabel } from "@/lib/utils";
 import type { Match } from "@/types";
 
@@ -38,6 +38,7 @@ function applyFilter(matches: Match[], filter: Filter): Match[] {
 export default function FixturePage() {
   const { data, isLoading, error } = useMatches();
   const { data: predictions } = usePredictions();
+  const { data: news } = useNews();
   const [filter, setFilter] = useState<Filter>("all");
 
   const grouped = useMemo(() => {
@@ -73,6 +74,26 @@ export default function FixturePage() {
       </div>
 
       <main className="px-4 pb-24 pt-3">
+        {news?.items && news.items.length > 0 && (
+          <div className="mb-4 -mx-4 flex gap-2.5 overflow-x-auto px-4">
+            {news.items.slice(0, 6).map((n) => (
+              <div
+                key={n.id}
+                className="w-56 flex-none overflow-hidden rounded-xl border border-gray-200 bg-white"
+              >
+                {n.image_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={n.image_url} alt="" className="h-24 w-full object-cover" />
+                )}
+                <div className="p-3">
+                  <div className="line-clamp-2 text-[13px] font-semibold text-gray-900">{n.title}</div>
+                  <p className="mt-1 line-clamp-2 text-[11px] text-gray-500">{n.body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {isLoading && (
           <div className="space-y-2">
             <CardSkeleton />

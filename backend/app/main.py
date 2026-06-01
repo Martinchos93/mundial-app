@@ -19,11 +19,70 @@ from app.routers import (
     ai,
     admin,
     standings,
+    news,
+    bracket,
+    squads,
 )
 from app.tasks.scheduler import start_scheduler, stop_scheduler
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def _ensure_group_integrity() -> None:
+    """Self-heal: every prode needs an active scoring column."""
+    from app.database import SessionLocal
+    from app.models import Group, Column
+    from app.models.column import DEFAULT_SCORING_CONFIG
+
+    db = SessionLocal()
+    try:
+        for g in db.query(Group).all():
+            if db.query(Column).filter(Column.group_ids.any(g.id)).count() == 0:
+                db.add(
+                    Column(
+                        name="General",
+                        status="active",
+                        group_ids=[g.id],
+                        match_ids=[],
+                        scoring_config=dict(DEFAULT_SCORING_CONFIG),
+                    )
+                )
+        db.commit()
+    except Exception:  # noqa: BLE001
+        logger.exception("Group integrity check failed")
+    finally:
+        db.close()
+
+
+def _bootstrap_admin() -> None:
+    """Create the first admin user from env vars if no admin exists yet."""
+    from app.database import SessionLocal
+    from app.models import User
+    from app.security import hash_password
+
+    db = SessionLocal()
+    try:
+        if db.query(User).filter(User.is_admin == True).first():  # noqa: E712
+            return
+        if db.query(User).filter(User.username == settings.ADMIN_USERNAME).first():
+            return
+        db.add(
+            User(
+                username=settings.ADMIN_USERNAME,
+                email=settings.ADMIN_EMAIL,
+                password_hash=hash_password(settings.ADMIN_PASSWORD),
+                first_name="Admin",
+                last_name="Mundial",
+                is_admin=True,
+            )
+        )
+        db.commit()
+        logger.info("Bootstrapped admin user '%s'", settings.ADMIN_USERNAME)
+    except Exception:  # noqa: BLE001
+        logger.exception("Admin bootstrap failed")
+    finally:
+        db.close()
 
 
 @asynccontextmanager
@@ -35,9 +94,25 @@ async def lifespan(app: FastAPI):
         await load_full_fixture()
     except Exception:  # noqa: BLE001
         logger.exception("Initial fixture load failed (continuing)")
+    _ensure_group_integrity()
+    _bootstrap_admin()
+    _load_squads()
     start_scheduler()
     yield
     stop_scheduler()
+
+
+def _load_squads() -> None:
+    from app.database import SessionLocal
+    from app.services.squads import load_static_squads
+
+    db = SessionLocal()
+    try:
+        load_static_squads(db)
+    except Exception:  # noqa: BLE001
+        logger.exception("Static squad load failed")
+    finally:
+        db.close()
 
 
 app = FastAPI(title="Mundial 2026 API", version="1.0.0", lifespan=lifespan)
@@ -55,6 +130,10 @@ app.add_middleware(
 
 for r in (auth, matches, teams, players, predictions, groups, leaderboard, ai, admin, standings):
     app.include_router(r.router)
+app.include_router(news.router)
+app.include_router(news.admin_router)
+app.include_router(bracket.router)
+app.include_router(squads.router)
 
 
 @app.get("/health", tags=["meta"])

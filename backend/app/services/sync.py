@@ -204,6 +204,7 @@ async def sync_live_matches() -> int:
                 stats = await football_api.get_fixture_statistics(match.api_id)
                 apply_statistics(db, match, stats)
         db.commit()
+        _advance_bracket(db)
         return len(live)
     finally:
         db.close()
@@ -220,9 +221,20 @@ async def sync_today_matches() -> int:
         for fx in fixtures:
             upsert_fixture(db, fx)
         db.commit()
+        _advance_bracket(db)
         return len(fixtures)
     finally:
         db.close()
+
+
+def _advance_bracket(db: Session) -> None:
+    """Propagate results into the knockout bracket (best-effort, never fatal)."""
+    try:
+        from app.services.bracket import resolve
+
+        resolve(db)
+    except Exception:  # noqa: BLE001
+        logger.exception("Bracket resolution failed")
 
 
 async def sync_team_stats() -> int:

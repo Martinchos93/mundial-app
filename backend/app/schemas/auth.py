@@ -1,25 +1,31 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 
 
-class JoinRequest(BaseModel):
-    name: str = Field(..., min_length=1, max_length=80)
+class RegisterRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=40)
+    password: str = Field(..., min_length=6, max_length=128)
+    first_name: str = Field(..., min_length=1, max_length=80)
+    last_name: str = Field(..., min_length=1, max_length=80)
+    age: int | None = Field(default=None, ge=0, le=120)
+    email: EmailStr
     avatar_emoji: str = Field(default="⚽", max_length=8)
-    invite_code: str = Field(..., min_length=6, max_length=6)
 
 
-class CreateGroupRequest(BaseModel):
-    name: str = Field(..., min_length=1, max_length=80)
-    avatar_emoji: str = Field(default="⚽", max_length=8)
-    group_name: str = Field(..., min_length=1, max_length=120)
+class LoginRequest(BaseModel):
+    username: str
+    password: str
 
 
 class UserOut(BaseModel):
     id: int
-    name: str
+    username: str
+    email: str
+    first_name: str
+    last_name: str
+    age: int | None = None
     avatar_emoji: str
-    group_id: int | None
     is_admin: bool
     created_at: datetime
 
@@ -29,4 +35,17 @@ class UserOut(BaseModel):
 class AuthResponse(BaseModel):
     token: str
     user: UserOut
-    invite_code: str | None = None
+
+
+class MembershipOut(BaseModel):
+    group_id: int
+    group_name: str
+    invite_code: str
+    status: str
+    role: str
+    is_creator: bool = False
+
+
+class MeResponse(BaseModel):
+    user: UserOut
+    memberships: list[MembershipOut]

@@ -2,14 +2,69 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from pydantic import BaseModel, Field, EmailStr
+
 from app.database import get_db
-from app.deps import require_admin_token
+from app.deps import get_current_admin
 from app.models import Column, Match, Prediction, User, Group, AIPrediction
 from app.models.column import DEFAULT_SCORING_CONFIG
 from app.schemas.column import ColumnCreate, ColumnUpdate, ColumnOut, ColumnStats
+from app.schemas.auth import UserOut
+from app.security import hash_password
 from app.services.sync import recalculate_column
 
-router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin_token)])
+router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(get_current_admin)])
+
+
+class AdminCreate(BaseModel):
+    username: str = Field(..., min_length=3, max_length=40)
+    password: str = Field(..., min_length=6, max_length=128)
+    first_name: str = Field(default="Admin", max_length=80)
+    last_name: str = Field(default="", max_length=80)
+    email: EmailStr
+
+
+@router.get("/admins", response_model=list[UserOut])
+def list_admins(db: Session = Depends(get_db)):
+    return [UserOut.model_validate(u) for u in db.query(User).filter(User.is_admin == True).all()]  # noqa: E712
+
+
+@router.post("/admins", response_model=UserOut, status_code=201)
+def create_admin(payload: AdminCreate, db: Session = Depends(get_db)):
+    existing = (
+        db.query(User)
+        .filter((User.username == payload.username) | (User.email == str(payload.email)))
+        .first()
+    )
+    if existing:
+        # Promote an existing matching user to admin instead of erroring.
+        existing.is_admin = True
+        db.commit()
+        db.refresh(existing)
+        return UserOut.model_validate(existing)
+    u = User(
+        username=payload.username,
+        email=str(payload.email),
+        password_hash=hash_password(payload.password),
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+        is_admin=True,
+    )
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+    return UserOut.model_validate(u)
+
+
+@router.post("/admins/{user_id}/revoke", response_model=UserOut)
+def revoke_admin(user_id: int, db: Session = Depends(get_db)):
+    u = db.get(User, user_id)
+    if u is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    u.is_admin = False
+    db.commit()
+    db.refresh(u)
+    return UserOut.model_validate(u)
 
 
 def _column_stats(db: Session, col: Column) -> ColumnStats:

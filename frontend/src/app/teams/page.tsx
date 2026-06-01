@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
+import BracketView from "@/components/bracket/BracketView";
 import { useStandings } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { Team } from "@/types";
@@ -42,6 +43,7 @@ export default function TeamsPage() {
   }, [data]);
 
   const [active, setActive] = useState("A");
+  const [view, setView] = useState<"grupos" | "cruces">("grupos");
   const selected = groups.includes(active) ? active : groups[0];
 
   const rows = useMemo(() => {
@@ -53,10 +55,39 @@ export default function TeamsPage() {
   return (
     <>
       <header className="sticky top-0 z-30 border-b border-gray-100 bg-white px-4 py-3">
-        <h1 className="text-base font-semibold text-gray-900">Tabla de grupos</h1>
-        <p className="text-[11px] text-gray-400">Mundial 2026</p>
+        <div className="mb-2.5 flex items-center justify-between">
+          <div>
+            <h1 className="text-base font-semibold text-gray-900">
+              {view === "grupos" ? "Tabla de grupos" : "Cuadro de cruces"}
+            </h1>
+            <p className="text-[11px] text-gray-400">Mundial 2026</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 rounded-lg bg-gray-100 p-1">
+          {(["grupos", "cruces"] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className={cn(
+                "rounded-md py-1.5 text-sm font-medium capitalize transition-colors",
+                view === v ? "bg-white text-gray-900 shadow-sm" : "text-gray-500",
+              )}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
       </header>
 
+      {view === "cruces" ? (
+        <>
+          <main className="px-4 pb-24 pt-3">
+            <BracketView />
+          </main>
+          <Navbar />
+        </>
+      ) : (
+      <>
       <div className="flex gap-1.5 overflow-x-auto border-b border-gray-100 bg-white px-4 py-2.5">
         {groups.map((g) => (
           <button
@@ -103,7 +134,7 @@ export default function TeamsPage() {
                   return (
                     <tr
                       key={t.id}
-                      onClick={() => router.push(`/teams/${t.id}`)}
+                      onClick={() => router.push(`/seleccion/${encodeURIComponent(t.name)}`)}
                       className="cursor-pointer"
                     >
                       <td
@@ -146,6 +177,8 @@ export default function TeamsPage() {
       </main>
 
       <Navbar />
+      </>
+      )}
     </>
   );
 }

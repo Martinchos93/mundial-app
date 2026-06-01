@@ -72,12 +72,15 @@ export default function MatchDetailPage({ params }: { params: { id: string } }) 
                 {match.phase || "Fase de grupos"}
               </p>
               <div className="flex items-center justify-around">
-                <div className="flex flex-col items-center gap-1">
+                <Link
+                  href={`/seleccion/${encodeURIComponent(match.home_team?.name || "")}`}
+                  className="flex flex-col items-center gap-1 transition-opacity hover:opacity-70"
+                >
                   <span className="text-5xl">{match.home_team?.flag_emoji || "🏳️"}</span>
                   <span className="text-sm font-medium text-gray-700">
                     {match.home_team?.short_name || match.home_team?.name}
                   </span>
-                </div>
+                </Link>
                 <div className="flex flex-col items-center">
                   {showScore ? (
                     <span className="text-4xl font-bold text-gray-900">
@@ -96,12 +99,15 @@ export default function MatchDetailPage({ params }: { params: { id: string } }) 
                     <span className="mt-1 text-xs text-gray-400">{formatFullDate(match.kickoff_at)}</span>
                   )}
                 </div>
-                <div className="flex flex-col items-center gap-1">
+                <Link
+                  href={`/seleccion/${encodeURIComponent(match.away_team?.name || "")}`}
+                  className="flex flex-col items-center gap-1 transition-opacity hover:opacity-70"
+                >
                   <span className="text-5xl">{match.away_team?.flag_emoji || "🏳️"}</span>
                   <span className="text-sm font-medium text-gray-700">
                     {match.away_team?.short_name || match.away_team?.name}
                   </span>
-                </div>
+                </Link>
               </div>
               {match.venue && (
                 <p className="mt-4 flex items-center justify-center gap-1 text-xs text-gray-400">

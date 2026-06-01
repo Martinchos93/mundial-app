@@ -1,8 +1,22 @@
 from datetime import datetime, timedelta, timezone
 
 from jose import jwt, JWTError
+from passlib.context import CryptContext
 
 from app.config import settings
+
+_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def hash_password(password: str) -> str:
+    return _pwd.hash(password)
+
+
+def verify_password(password: str, password_hash: str) -> bool:
+    try:
+        return _pwd.verify(password, password_hash)
+    except ValueError:
+        return False
 
 
 def create_access_token(user_id: int) -> str:

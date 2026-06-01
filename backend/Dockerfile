@@ -15,5 +15,5 @@ COPY app ./app
 
 EXPOSE 8000
 
-# Run migrations, then launch the API (which loads the fixture + scheduler).
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+# Run migrations, then launch the API. Honour $PORT (Railway/Render inject it).
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

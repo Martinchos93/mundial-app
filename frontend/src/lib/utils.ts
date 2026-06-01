@@ -73,14 +73,21 @@ export function timezoneLabel(): string {
 }
 
 // ---- localStorage session helpers -------------------------------------
-// Auth against the backend is JWT-based: we store the bearer token plus the
-// numeric user/group ids and the invite code (for display). The active
-// column is derived from the group's columns, not stored here.
+// JWT-based auth. We store the bearer token, the logged-in user (JSON) and
+// the currently-selected prode (a user can be in several).
 
 const K_TOKEN = "m26_token";
-const K_USER = "m26_user_id";
-const K_GROUP_ID = "m26_group_id";
-const K_GROUP_CODE = "m26_group_code";
+const K_USER = "m26_user";
+const K_SELECTED = "m26_selected_group";
+
+export interface SessionUser {
+  id: number;
+  username: string;
+  first_name: string;
+  last_name: string;
+  avatar_emoji: string;
+  is_admin: boolean;
+}
 
 function read(key: string): string | null {
   if (typeof window === "undefined") return null;
@@ -88,24 +95,39 @@ function read(key: string): string | null {
 }
 
 export const getToken = () => read(K_TOKEN);
-export const getUserId = () => read(K_USER);
-export const getGroupId = () => read(K_GROUP_ID);
-export const getGroupCode = () => read(K_GROUP_CODE);
 
-export function saveAuth(
-  token: string,
-  userId: string | number,
-  groupId: string | number | null,
-  groupCode: string,
-) {
+export function getUser(): SessionUser | null {
+  const raw = read(K_USER);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as SessionUser;
+  } catch {
+    return null;
+  }
+}
+
+export const getUserId = (): string | null => {
+  const u = getUser();
+  return u ? String(u.id) : null;
+};
+
+export const isAdmin = (): boolean => !!getUser()?.is_admin;
+
+export const getSelectedGroupId = () => read(K_SELECTED);
+
+export function setSelectedGroupId(groupId: string | number | null) {
+  if (typeof window === "undefined") return;
+  if (groupId == null) window.localStorage.removeItem(K_SELECTED);
+  else window.localStorage.setItem(K_SELECTED, String(groupId));
+}
+
+export function saveAuth(token: string, user: SessionUser) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(K_TOKEN, token);
-  window.localStorage.setItem(K_USER, String(userId));
-  if (groupId != null) window.localStorage.setItem(K_GROUP_ID, String(groupId));
-  window.localStorage.setItem(K_GROUP_CODE, groupCode);
+  window.localStorage.setItem(K_USER, JSON.stringify(user));
 }
 
 export function clearSession() {
   if (typeof window === "undefined") return;
-  [K_TOKEN, K_USER, K_GROUP_ID, K_GROUP_CODE].forEach((k) => window.localStorage.removeItem(k));
+  [K_TOKEN, K_USER, K_SELECTED].forEach((k) => window.localStorage.removeItem(k));
 }

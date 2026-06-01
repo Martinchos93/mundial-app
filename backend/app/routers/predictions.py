@@ -6,8 +6,23 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.deps import get_current_user
-from app.models import User, Match, Column, Prediction
+from app.models import User, Match, Column, Prediction, Membership
 from app.schemas.prediction import PredictionCreate, PredictionOut, GroupPredictionEntry
+
+
+def _active_member(db: Session, user_id: int, group_ids: list[int]) -> bool:
+    if not group_ids:
+        return True
+    return (
+        db.query(Membership)
+        .filter(
+            Membership.user_id == user_id,
+            Membership.group_id.in_(group_ids),
+            Membership.status == "active",
+        )
+        .first()
+        is not None
+    )
 
 router = APIRouter(prefix="/predictions", tags=["predictions"])
 
@@ -43,6 +58,9 @@ def upsert_prediction(
     if column.status == "closed":
         raise HTTPException(status_code=400, detail="Column is closed")
 
+    if not _active_member(db, current_user.id, list(column.group_ids or [])):
+        raise HTTPException(status_code=403, detail="Tu ingreso al prode está pendiente de aprobación")
+
     if _is_locked(match):
         raise HTTPException(status_code=400, detail="Predictions are locked for this match")
 
@@ -77,16 +95,23 @@ def upsert_prediction(
 @router.get("/match/{match_id}", response_model=list[GroupPredictionEntry])
 def group_predictions(
     match_id: int,
+    group_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if current_user.group_id is None:
+    member_ids = [
+        m.user_id
+        for m in db.query(Membership).filter(
+            Membership.group_id == group_id, Membership.status == "active"
+        )
+    ]
+    if not member_ids:
         return []
 
     rows = (
         db.query(Prediction, User)
         .join(User, User.id == Prediction.user_id)
-        .filter(Prediction.match_id == match_id, User.group_id == current_user.group_id)
+        .filter(Prediction.match_id == match_id, User.id.in_(member_ids))
         .all()
     )
     out: list[GroupPredictionEntry] = []
@@ -94,7 +119,7 @@ def group_predictions(
         out.append(
             GroupPredictionEntry(
                 user_id=user.id,
-                name=user.name,
+                name=user.display_name,
                 avatar_emoji=user.avatar_emoji,
                 pred_home_score=pred.pred_home_score,
                 pred_away_score=pred.pred_away_score,

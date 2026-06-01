@@ -11,22 +11,19 @@ import type {
   Prediction,
   LeaderboardEntry,
   MatchEvent,
-  User,
+  News,
+  Member,
 } from "@/types";
-import { getToken, getGroupId, saveAuth } from "@/lib/utils";
+import { getToken, getSelectedGroupId, saveAuth, type SessionUser } from "@/lib/utils";
 import { flagFor } from "@/lib/flags";
 
 const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-const adminToken = process.env.NEXT_PUBLIC_ADMIN_TOKEN || "";
 
 export const http = axios.create({ baseURL });
 
 http.interceptors.request.use((config) => {
   const token = getToken();
   if (token) config.headers["Authorization"] = `Bearer ${token}`;
-  if (adminToken && (config.url ?? "").startsWith("/admin")) {
-    config.headers["X-Admin-Token"] = adminToken;
-  }
   return config;
 });
 
@@ -290,6 +287,25 @@ export function useAIPrediction(matchId: string | number | null) {
   );
 }
 
+export interface BracketMatch {
+  match_no: number;
+  round: string;
+  home_label: string;
+  away_label: string;
+  home_team: string | null;
+  away_team: string | null;
+  home_score: number | null;
+  away_score: number | null;
+  status: string;
+  venue: string | null;
+}
+
+export function useBracket() {
+  return useSWR<Record<number, BracketMatch>>("/bracket", (url: string) =>
+    http.get(url).then((r) => r.data.matches as Record<number, BracketMatch>),
+  );
+}
+
 export function useStandings() {
   return useSWR<Team[]>("/standings", (url: string) =>
     http.get(url).then((r) =>
@@ -457,7 +473,7 @@ export function usePredictions() {
 
 /** Resolve the group's active column (reactive). */
 export function useActiveColumnId(): number | null {
-  const { data: columns } = useGroupColumns(getGroupId());
+  const { data: columns } = useGroupColumns(getSelectedGroupId());
   if (!columns || columns.length === 0) return null;
   const active = columns.find((c) => c.status === "active") ?? columns[0];
   return active?.id ?? null;
@@ -484,33 +500,63 @@ export async function submitPrediction(body: SubmitPredictionBody): Promise<Pred
   return adaptPrediction(res.data);
 }
 
-export async function createGroup(
-  name: string,
-  userName: string,
-): Promise<{ data: Group; user: User }> {
-  const res = await http.post(`/auth/create-group`, {
-    name: userName,
-    avatar_emoji: "⚽",
-    group_name: name,
-  });
-  const { token, user, invite_code } = res.data;
-  saveAuth(token, user.id, user.group_id, invite_code);
-  return { data: { id: user.group_id, name, invite_code }, user };
+// ---- Account auth -------------------------------------------------------
+
+export interface RegisterBody {
+  username: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+  age?: number | null;
+  email: string;
+  avatar_emoji?: string;
 }
 
-export async function joinGroup(
-  code: string,
-  userName: string,
-  avatarEmoji: string,
-): Promise<{ data: User; group: Group }> {
-  const res = await http.post(`/auth/join`, {
-    name: userName,
-    avatar_emoji: avatarEmoji,
-    invite_code: code,
-  });
-  const { token, user, invite_code } = res.data;
-  saveAuth(token, user.id, user.group_id, invite_code);
-  return { data: user, group: { id: user.group_id, name: "", invite_code } };
+export async function register(body: RegisterBody): Promise<SessionUser> {
+  const res = await http.post(`/auth/register`, body);
+  saveAuth(res.data.token, res.data.user as SessionUser);
+  return res.data.user as SessionUser;
+}
+
+export async function login(username: string, password: string): Promise<SessionUser> {
+  const res = await http.post(`/auth/login`, { username, password });
+  saveAuth(res.data.token, res.data.user as SessionUser);
+  return res.data.user as SessionUser;
+}
+
+/** Create a new prode; returns its group. */
+export async function createProde(name: string): Promise<Group> {
+  const res = await http.post(`/groups`, { name });
+  return res.data as Group;
+}
+
+/** Request to join a prode by invite code; returns {group_id, status}. */
+export async function joinProde(code: string): Promise<{ group_id: number; status: string }> {
+  const res = await http.post(`/groups/${code.toUpperCase()}/join`);
+  return res.data;
+}
+
+// ---- Admin management ---------------------------------------------------
+
+export function useAdmins() {
+  return useSWR<SessionUser[]>("/admin/admins", (url: string) => http.get(url).then((r) => r.data));
+}
+
+export interface CreateAdminBody {
+  username: string;
+  password: string;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+}
+
+export async function createAdmin(body: CreateAdminBody): Promise<SessionUser> {
+  const res = await http.post(`/admin/admins`, body);
+  return res.data;
+}
+
+export async function revokeAdmin(userId: number): Promise<void> {
+  await http.post(`/admin/admins/${userId}/revoke`);
 }
 
 export interface CreateColumnBody {
@@ -557,4 +603,122 @@ export async function updateColumn(
 
 export async function recalculateColumn(id: number): Promise<void> {
   await http.post(`/admin/columns/${id}/recalculate`);
+}
+
+// ---- Current user --------------------------------------------------------
+
+export interface MembershipInfo {
+  group_id: number;
+  group_name: string;
+  invite_code: string;
+  status: "active" | "pending";
+  role: string;
+  is_creator: boolean;
+}
+
+export interface MeData {
+  user: SessionUser;
+  memberships: MembershipInfo[];
+}
+
+export function useMe() {
+  const token = getToken();
+  return useSWR<MeData>(token ? "/auth/me" : null, (url: string) =>
+    http.get(url).then((r) => r.data as MeData),
+  );
+}
+
+// ---- News ----------------------------------------------------------------
+
+export interface NewsPage {
+  items: News[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export function useNews(page = 1, pageSize = 10) {
+  return useSWR<NewsPage>(`/news?page=${page}&page_size=${pageSize}`, (url: string) =>
+    http.get(url).then((r) => r.data as NewsPage),
+  );
+}
+
+export interface SquadPlayer {
+  id: number;
+  name: string;
+  position: string | null;
+  number: number | null;
+  age: number | null;
+  photo_url: string | null;
+  bio?: string | null;
+  wiki_url?: string | null;
+  club?: string | null;
+  birth_date?: string | null;
+  season_apps?: number | null;
+  season_goals?: number | null;
+}
+
+export function useSquad(teamName: string | null) {
+  return useSWR<{ team: string; players: SquadPlayer[] }>(
+    teamName ? `/squad/${encodeURIComponent(teamName)}` : null,
+    (url: string) => http.get(url).then((r) => r.data),
+  );
+}
+
+export async function syncSquads(): Promise<Record<string, unknown>> {
+  const res = await http.post(`/admin/squads/sync`);
+  return res.data;
+}
+
+export function useAdminNews() {
+  return useSWR<News[]>("/admin/news", (url: string) => http.get(url).then((r) => r.data as News[]));
+}
+
+export interface NewsBody {
+  title: string;
+  body: string;
+  image_url?: string | null;
+  author?: string | null;
+  published?: boolean;
+}
+
+export async function createNews(body: NewsBody): Promise<News> {
+  const res = await http.post(`/admin/news`, body);
+  return res.data as News;
+}
+
+export async function updateNews(id: number, body: Partial<NewsBody>): Promise<News> {
+  const res = await http.put(`/admin/news/${id}`, body);
+  return res.data as News;
+}
+
+export async function deleteNews(id: number): Promise<void> {
+  await http.delete(`/admin/news/${id}`);
+}
+
+// ---- Group members / approval -------------------------------------------
+
+export function useMembers(groupId: string | number | null) {
+  return useSWR<Member[]>(groupId ? `/groups/${groupId}/members` : null, (url: string) =>
+    http.get(url).then((r) => r.data as Member[]),
+  );
+}
+
+export async function approveMember(groupId: number, userId: number): Promise<void> {
+  await http.post(`/groups/${groupId}/members/${userId}/approve`);
+}
+
+export async function rejectMember(groupId: number, userId: number): Promise<void> {
+  await http.post(`/groups/${groupId}/members/${userId}/reject`);
+}
+
+// ---- Tournament simulation (demo tools) ---------------------------------
+
+export async function simulateTournament(): Promise<{ champion?: string }> {
+  const res = await http.post(`/admin/bracket/simulate`);
+  return res.data;
+}
+
+export async function resetTournament(): Promise<void> {
+  await http.post(`/admin/bracket/reset`);
 }

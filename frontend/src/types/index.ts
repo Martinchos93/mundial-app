@@ -110,13 +110,33 @@ export interface User {
   name: string;
   avatar_emoji: string;
   is_admin: boolean;
+  status?: "active" | "pending";
 }
 
 export interface Group {
   id: number;
   name: string;
   invite_code: string;
+  creator_id?: number | null;
   members?: User[];
+}
+
+export interface Member {
+  user_id: number;
+  name: string;
+  avatar_emoji: string;
+  status: "active" | "pending";
+  is_creator: boolean;
+}
+
+export interface News {
+  id: number;
+  title: string;
+  body: string;
+  image_url: string | null;
+  author: string | null;
+  published: boolean;
+  created_at: string;
 }
 
 export interface Column {

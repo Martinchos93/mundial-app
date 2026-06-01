@@ -19,7 +19,12 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60 * 24 * 30  # 30 days
 
-    ADMIN_TOKEN: str = "change-me-admin-token"
+    ADMIN_TOKEN: str = "change-me-admin-token"  # legacy, unused
+
+    # First admin bootstrapped on startup if it doesn't exist.
+    ADMIN_USERNAME: str = "admin"
+    ADMIN_EMAIL: str = "admin@mundial2026.app"
+    ADMIN_PASSWORD: str = "admin1234"
 
     CORS_ORIGINS: str = "http://localhost:3000"
 

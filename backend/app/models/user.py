@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import String, DateTime, ForeignKey, Boolean, func
+from sqlalchemy import String, DateTime, Integer, Boolean, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -10,11 +10,23 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    username: Mapped[str] = mapped_column(String(40), unique=True, index=True, nullable=False)
+    email: Mapped[str] = mapped_column(String(160), unique=True, index=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    first_name: Mapped[str] = mapped_column(String(80), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(80), nullable=False)
+    age: Mapped[int | None] = mapped_column(Integer, nullable=True)
     avatar_emoji: Mapped[str] = mapped_column(String(8), default="⚽")
-    group_id: Mapped[int | None] = mapped_column(ForeignKey("groups.id", ondelete="SET NULL"), nullable=True)
-    is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    group: Mapped["Group | None"] = relationship(back_populates="users")  # noqa: F821
+    memberships: Mapped[list["Membership"]] = relationship(  # noqa: F821
+        back_populates="user", cascade="all, delete-orphan"
+    )
     predictions: Mapped[list["Prediction"]] = relationship(back_populates="user")  # noqa: F821
+
+    @property
+    def display_name(self) -> str:
+        return self.first_name or self.username

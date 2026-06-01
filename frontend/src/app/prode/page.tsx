@@ -6,21 +6,33 @@ import { ArrowLeft } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import MatchCard from "@/components/match/MatchCard";
 import PredictionForm from "@/components/prode/PredictionForm";
-import { useGroup, useMatches, usePredictions, useActiveColumnId } from "@/lib/api";
-import { getToken, getGroupId } from "@/lib/utils";
+import { useMatches, usePredictions, useActiveColumnId, useMe } from "@/lib/api";
+import { getToken, getSelectedGroupId } from "@/lib/utils";
 import type { Match } from "@/types";
 
-function NoSession() {
+function PendingNotice() {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
+      <span className="text-5xl">⏳</span>
+      <h1 className="mt-4 text-lg font-semibold text-gray-900">Esperando aprobación</h1>
+      <p className="mt-1 text-sm text-gray-400">
+        El creador del grupo tiene que aceptarte antes de que puedas predecir.
+      </p>
+      <Link href="/grupos" className="mt-5 text-sm font-medium text-blue-600">
+        Ver estado del grupo
+      </Link>
+    </div>
+  );
+}
+
+function NoProde({ title, body, cta }: { title: string; body: string; cta: string }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
       <span className="text-5xl">🏆</span>
-      <h1 className="mt-4 text-lg font-semibold text-gray-900">Unite a un grupo</h1>
-      <p className="mt-1 text-sm text-gray-400">Creá o unite a un grupo para empezar a predecir.</p>
-      <Link
-        href="/grupos"
-        className="mt-5 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-      >
-        Ir a Grupos
+      <h1 className="mt-4 text-lg font-semibold text-gray-900">{title}</h1>
+      <p className="mt-1 text-sm text-gray-400">{body}</p>
+      <Link href="/grupos" className="mt-5 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700">
+        {cta}
       </Link>
     </div>
   );
@@ -28,16 +40,21 @@ function NoSession() {
 
 export default function ProdePage() {
   const token = getToken();
-  const groupId = getGroupId();
+  const groupId = getSelectedGroupId();
   const columnId = useActiveColumnId();
 
   const [selected, setSelected] = useState<Match | null>(null);
 
-  const { data: group } = useGroup(groupId);
+  const { data: me } = useMe();
   const { data: matches, isLoading } = useMatches();
   const { data: predictions, mutate: mutatePreds } = usePredictions();
 
-  if (!token || !groupId) return <NoSession />;
+  if (!token) return <NoProde title="Iniciá sesión" body="Necesitás una cuenta para jugar al prode." cta="Ir a iniciar sesión" />;
+  if (!groupId) return <NoProde title="Elegí un prode" body="Creá o unite a un prode para empezar a predecir." cta="Ir a Prodes" />;
+
+  const membership = me?.memberships.find((m) => String(m.group_id) === String(groupId));
+  const group = membership ? { name: membership.group_name } : null;
+  if (membership && membership.status === "pending") return <PendingNotice />;
 
   const findPred = (matchId: number) => predictions?.find((p) => p.match_id === matchId);
   const upcoming = (matches ?? []).filter((m) => m.status === "scheduled");

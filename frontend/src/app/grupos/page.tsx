@@ -1,339 +1,232 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Users, Plus, LogIn, Copy, Check } from "lucide-react";
+import { Plus, LogIn, Copy, Check, UserCheck, X, LogOut, Crown } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import {
-  createGroup,
-  joinGroup,
-  useGroup,
-  useGroupColumns,
+  useMe,
   useLeaderboard,
+  useMembers,
+  createProde,
+  joinProde,
+  approveMember,
+  rejectMember,
+  type MembershipInfo,
 } from "@/lib/api";
-import { cn, getToken, getGroupId, getUserId } from "@/lib/utils";
-import type { Column, LeaderboardEntry } from "@/types";
+import {
+  cn,
+  getToken,
+  getUser,
+  getSelectedGroupId,
+  setSelectedGroupId,
+  clearSession,
+} from "@/lib/utils";
+import type { LeaderboardEntry } from "@/types";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
-const AV_COLORS = [
-  "bg-blue-100 text-blue-600",
-  "bg-amber-100 text-amber-600",
-  "bg-green-100 text-green-600",
-  "bg-pink-100 text-pink-600",
-  "bg-purple-100 text-purple-600",
-  "bg-orange-100 text-orange-600",
-];
+const AV = ["bg-blue-100 text-blue-600", "bg-amber-100 text-amber-600", "bg-green-100 text-green-600", "bg-pink-100 text-pink-600", "bg-purple-100 text-purple-600", "bg-orange-100 text-orange-600"];
+const initials = (n: string) => n.trim().slice(0, 2).toUpperCase();
 
-function initials(name: string): string {
-  return name.trim().slice(0, 2).toUpperCase();
-}
-
-const COL_BADGE: Record<Column["status"], { label: string; cls: string }> = {
-  active: { label: "Activa", cls: "bg-green-100 text-green-600" },
-  draft: { label: "Próxima", cls: "bg-gray-100 text-gray-500" },
-  closed: { label: "Cerrada", cls: "bg-gray-100 text-gray-500" },
-};
-
-// ---- Group hub (when in a session) ------------------------------------
-
-function LeaderRow({ entry, rank, isMe }: { entry: LeaderboardEntry; rank: number; isMe: boolean }) {
+function LeaderRow({ e, rank, isMe }: { e: LeaderboardEntry; rank: number; isMe: boolean }) {
   return (
-    <div
-      className={cn(
-        "flex items-center gap-2.5 border-b border-gray-100 px-3.5 py-2.5 last:border-0",
-        isMe && "bg-blue-50",
-      )}
-    >
-      {rank <= 3 ? (
-        <span className="w-6 text-center text-base">{MEDALS[rank - 1]}</span>
-      ) : (
-        <span className="w-6 text-center text-[13px] text-gray-400">{rank}</span>
-      )}
-      <span
-        className={cn(
-          "flex h-[34px] w-[34px] items-center justify-center rounded-full text-[13px] font-medium",
-          AV_COLORS[entry.user_id % AV_COLORS.length],
-        )}
-      >
-        {entry.avatar_emoji && entry.avatar_emoji.length <= 2 ? entry.avatar_emoji : initials(entry.name)}
+    <div className={cn("flex items-center gap-2.5 border-b border-gray-100 px-3.5 py-2.5 last:border-0", isMe && "bg-blue-50")}>
+      <span className="w-6 text-center text-base">{rank <= 3 ? MEDALS[rank - 1] : <span className="text-[13px] text-gray-400">{rank}</span>}</span>
+      <span className={cn("flex h-[34px] w-[34px] items-center justify-center rounded-full text-[13px] font-medium", AV[e.user_id % AV.length])}>
+        {e.avatar_emoji && e.avatar_emoji.length <= 2 ? e.avatar_emoji : initials(e.name)}
       </span>
       <div className="flex-1">
-        <div className="text-[13px] font-medium text-gray-900">
-          {entry.name}
-          {isMe && <span className="ml-1 text-xs font-normal text-blue-600">(vos)</span>}
-        </div>
-        <div className="text-[11px] text-gray-400">
-          {entry.total_points} pts{entry.streak ? ` · racha ${entry.streak}` : ""}
-        </div>
+        <div className="text-[13px] font-medium text-gray-900">{e.name}{isMe && <span className="ml-1 text-xs font-normal text-blue-600">(vos)</span>}</div>
+        <div className="text-[11px] text-gray-400">{e.total_points} pts{e.streak ? ` · racha ${e.streak}` : ""}</div>
       </div>
-      <div className="text-right">
-        <div className="text-[15px] font-semibold text-gray-900">{entry.total_points}</div>
-        {!!entry.delta_today && entry.delta_today > 0 && (
-          <div className="text-[11px] text-green-600">+{entry.delta_today} hoy</div>
-        )}
+      <div className="text-[15px] font-semibold text-gray-900">{e.total_points}</div>
+    </div>
+  );
+}
+
+function SelectedProde({ m, userId }: { m: MembershipInfo; userId: number }) {
+  const gid = m.group_id;
+  const { data: leaderboard } = useLeaderboard(gid);
+  const { data: members, mutate: mutateMembers } = useMembers(gid);
+  const [copied, setCopied] = useState(false);
+
+  const pending = (members ?? []).filter((x) => x.status === "pending");
+
+  async function decide(uid: number, ok: boolean) {
+    if (ok) await approveMember(gid, uid);
+    else await rejectMember(gid, uid);
+    mutateMembers();
+  }
+  function copyCode() {
+    navigator.clipboard?.writeText(m.invite_code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  }
+
+  return (
+    <div className="mt-2">
+      <div className="mb-3 flex items-center justify-between rounded-xl border border-gray-200 bg-white px-3.5 py-3">
+        <div>
+          <div className="text-sm font-semibold text-gray-900">{m.group_name}</div>
+          <div className="font-mono text-[11px] text-gray-400">Código: {m.invite_code}</div>
+        </div>
+        <button onClick={copyCode} className="flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-600 hover:bg-gray-50">
+          {copied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
+          {copied ? "Copiado" : "Invitar"}
+        </button>
+      </div>
+
+      {m.is_creator && pending.length > 0 && (
+        <>
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-amber-600">Solicitudes pendientes ({pending.length})</p>
+          <div className="mb-4 overflow-hidden rounded-xl border border-amber-200 bg-amber-50/40">
+            {pending.map((x) => (
+              <div key={x.user_id} className="flex items-center gap-2.5 border-b border-amber-100 px-3.5 py-2.5 last:border-0">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-base">{x.avatar_emoji || "⚽"}</span>
+                <span className="flex-1 text-[13px] font-medium text-gray-900">{x.name}</span>
+                <button onClick={() => decide(x.user_id, true)} className="flex h-8 w-8 items-center justify-center rounded-full bg-green-600 text-white hover:bg-green-700"><UserCheck className="h-4 w-4" /></button>
+                <button onClick={() => decide(x.user_id, false)} className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300"><X className="h-4 w-4" /></button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-gray-400">Posiciones</p>
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        {(leaderboard ?? []).map((e, i) => <LeaderRow key={e.user_id} e={e} rank={i + 1} isMe={e.user_id === userId} />)}
+        {leaderboard?.length === 0 && <p className="px-3.5 py-6 text-center text-sm text-gray-400">Todavía no hay puntos.</p>}
       </div>
     </div>
   );
 }
 
-function GroupHub({ groupId, userId }: { groupId: string; userId: string }) {
-  const { data: group } = useGroup(groupId);
-  const { data: columns } = useGroupColumns(groupId);
-  const { data: leaderboard } = useLeaderboard(groupId);
-  const [copied, setCopied] = useState(false);
+export default function GruposPage() {
+  const router = useRouter();
+  const { data: me, mutate } = useMe();
+  const [selected, setSelected] = useState<number | null>(null);
+  const [mode, setMode] = useState<"none" | "create" | "join">("none");
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const code = group?.invite_code ?? "";
-  const activeColumn = columns?.find((c) => c.status === "active");
-  const me = leaderboard?.find((e) => e.user_id === Number(userId));
-  const memberCount = group?.members?.length ?? leaderboard?.length ?? 0;
+  useEffect(() => {
+    if (typeof window !== "undefined" && !getToken()) router.replace("/login");
+  }, [router]);
 
-  function copyCode() {
-    navigator.clipboard?.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
+  useEffect(() => {
+    if (!me) return;
+    const stored = getSelectedGroupId();
+    const active = me.memberships.filter((m) => m.status === "active");
+    const pick = stored && me.memberships.some((m) => String(m.group_id) === stored) ? Number(stored) : active[0]?.group_id ?? null;
+    setSelected(pick);
+    if (pick) setSelectedGroupId(pick);
+  }, [me]);
+
+  if (!getToken()) return null;
+
+  const user = getUser();
+
+  async function doCreate() {
+    if (!name.trim()) return;
+    setBusy(true); setErr(null);
+    try {
+      const g = await createProde(name.trim());
+      setSelectedGroupId(g.id);
+      setSelected(g.id);
+      setName(""); setMode("none");
+      mutate();
+    } catch { setErr("No se pudo crear el prode."); }
+    finally { setBusy(false); }
   }
+  async function doJoin() {
+    if (!code.trim()) return;
+    setBusy(true); setErr(null);
+    try {
+      await joinProde(code.trim());
+      setCode(""); setMode("none");
+      mutate();
+    } catch (e: unknown) {
+      setErr((e as { response?: { status?: number } })?.response?.status === 404 ? "Código inválido." : "No se pudo unir.");
+    } finally { setBusy(false); }
+  }
+  function logout() {
+    clearSession();
+    router.replace("/login");
+  }
+
+  const selectedMembership = me?.memberships.find((m) => m.group_id === selected) ?? null;
 
   return (
     <>
-      <div className="border-b border-gray-100 bg-white px-4 py-5 text-center">
-        <div className="text-lg font-semibold text-gray-900">{group?.name ?? "Mi grupo"}</div>
-        <div className="mt-1 text-xs text-gray-400">
-          {memberCount} integrantes
-          {activeColumn && ` · Columna activa: ${activeColumn.name}`}
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-gray-100 bg-white px-4 py-3">
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-base">{user?.avatar_emoji || "⚽"}</span>
+          <div>
+            <div className="text-sm font-semibold text-gray-900">{user?.first_name} {user?.last_name}</div>
+            <div className="text-[11px] text-gray-400">@{user?.username}</div>
+          </div>
         </div>
-        <span className="mt-2 inline-block rounded-full bg-gray-100 px-3 py-1 font-mono text-xs text-gray-500">
-          {code}
-        </span>
-      </div>
+        <button onClick={logout} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700"><LogOut className="h-4 w-4" /> Salir</button>
+      </header>
 
       <main className="px-4 pb-24 pt-3">
-        <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-gray-400">Posiciones</p>
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-          {(leaderboard ?? []).map((entry, i) => (
-            <LeaderRow key={entry.user_id} entry={entry} rank={i + 1} isMe={entry.user_id === Number(userId)} />
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Mis prodes</p>
+          <div className="flex gap-1.5">
+            <button onClick={() => setMode(mode === "create" ? "none" : "create")} className="flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-medium text-white"><Plus className="h-3.5 w-3.5" /> Crear</button>
+            <button onClick={() => setMode(mode === "join" ? "none" : "join")} className="flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-xs text-gray-600"><LogIn className="h-3.5 w-3.5" /> Unirme</button>
+          </div>
+        </div>
+
+        {mode === "create" && (
+          <div className="mb-3 flex gap-2 rounded-xl border border-gray-200 bg-white p-2.5">
+            <input className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" placeholder="Nombre del prode" value={name} onChange={(e) => setName(e.target.value)} />
+            <button onClick={doCreate} disabled={busy} className="rounded-lg bg-blue-600 px-3 text-sm font-medium text-white disabled:opacity-60">Crear</button>
+          </div>
+        )}
+        {mode === "join" && (
+          <div className="mb-3 flex gap-2 rounded-xl border border-gray-200 bg-white p-2.5">
+            <input className="flex-1 rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm uppercase tracking-widest focus:border-blue-400 focus:outline-none" placeholder="CÓDIGO" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} />
+            <button onClick={doJoin} disabled={busy} className="rounded-lg bg-blue-600 px-3 text-sm font-medium text-white disabled:opacity-60">Unirme</button>
+          </div>
+        )}
+        {err && <p className="mb-2 text-xs text-red-500">{err}</p>}
+
+        <div className="space-y-2">
+          {me?.memberships.length === 0 && <p className="rounded-xl border border-gray-200 bg-white p-5 text-center text-sm text-gray-400">Todavía no estás en ningún prode. Creá uno o unite con un código.</p>}
+          {me?.memberships.map((m) => (
+            <button
+              key={m.group_id}
+              onClick={() => { setSelected(m.group_id); setSelectedGroupId(m.group_id); }}
+              className={cn("flex w-full items-center justify-between rounded-xl border bg-white px-3.5 py-3 text-left", selected === m.group_id ? "border-blue-300 ring-1 ring-blue-200" : "border-gray-200")}
+            >
+              <div>
+                <div className="flex items-center gap-1.5 text-sm font-medium text-gray-900">
+                  {m.group_name}
+                  {m.is_creator && <Crown className="h-3.5 w-3.5 text-amber-500" />}
+                </div>
+                <div className="font-mono text-[11px] text-gray-400">{m.invite_code}</div>
+              </div>
+              {m.status === "pending"
+                ? <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] text-amber-600">Pendiente</span>
+                : <span className="rounded-full bg-green-50 px-2 py-0.5 text-[11px] text-green-600">Activo</span>}
+            </button>
           ))}
-          {leaderboard?.length === 0 && (
-            <p className="px-3.5 py-6 text-center text-sm text-gray-400">Todavía no hay puntos cargados.</p>
-          )}
         </div>
 
-        <p className="mb-2 mt-5 text-[11px] font-medium uppercase tracking-wider text-gray-400">Columnas</p>
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-          {(columns ?? []).map((c) => {
-            const badge = COL_BADGE[c.status];
-            return (
-              <div
-                key={c.id}
-                className="flex items-center justify-between border-b border-gray-100 px-3.5 py-2.5 last:border-0"
-              >
-                <div>
-                  <div className="text-[13px] font-medium text-gray-900">{c.name}</div>
-                  <div className="text-[11px] text-gray-400">
-                    R{c.pts_result} · G{c.pts_goals} · E{c.pts_exact_score}
-                  </div>
-                </div>
-                <span className={cn("rounded-full px-2 py-0.5 text-[11px]", badge.cls)}>{badge.label}</span>
-              </div>
-            );
-          })}
-          {columns?.length === 0 && (
-            <p className="px-3.5 py-6 text-center text-sm text-gray-400">Sin columnas todavía.</p>
-          )}
-        </div>
-
-        {me && (
-          <>
-            <p className="mb-2 mt-5 text-[11px] font-medium uppercase tracking-wider text-gray-400">Mis stats</p>
-            <div className="rounded-xl border border-gray-200 bg-white px-3.5 py-1">
-              <div className="flex justify-between border-b border-gray-100 py-2 text-[13px]">
-                <span className="text-gray-500">Puntos totales</span>
-                <span className="font-medium text-gray-900">{me.total_points}</span>
-              </div>
-              <div className="flex justify-between border-b border-gray-100 py-2 text-[13px]">
-                <span className="text-gray-500">Posición</span>
-                <span className="font-medium text-gray-900">#{me.rank}</span>
-              </div>
-              <div className="flex justify-between py-2 text-[13px]">
-                <span className="text-gray-500">Racha</span>
-                <span className="font-medium text-gray-900">{me.streak ?? 0}</span>
-              </div>
-            </div>
-          </>
+        {selectedMembership && selectedMembership.status === "active" && user && (
+          <SelectedProde m={selectedMembership} userId={user.id} />
         )}
-
-        <div className="mt-4 flex gap-2">
-          <button
-            onClick={copyCode}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white py-2.5 text-[13px] text-gray-600 transition-colors hover:bg-gray-50"
-          >
-            {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
-            {copied ? "Copiado" : "Copiar código"}
-          </button>
-          <button
-            onClick={copyCode}
-            className="flex-1 rounded-lg bg-blue-600 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-blue-700"
-          >
-            Invitar
-          </button>
-        </div>
+        {selectedMembership && selectedMembership.status === "pending" && (
+          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50/40 p-4 text-center text-sm text-amber-700">
+            Tu ingreso a <b>{selectedMembership.group_name}</b> está pendiente de aprobación del creador.
+          </p>
+        )}
       </main>
 
       <Navbar />
     </>
   );
-}
-
-// ---- Create / join (when no session) ----------------------------------
-
-type Mode = "choose" | "create" | "join";
-const EMOJIS = ["⚽", "🦁", "🐉", "🦅", "🐺", "🔥", "⭐", "👑", "🚀", "🐯"];
-
-function CreateJoin() {
-  const router = useRouter();
-  const [mode, setMode] = useState<Mode>("choose");
-  const [groupName, setGroupName] = useState("");
-  const [userName, setUserName] = useState("");
-  const [code, setCode] = useState("");
-  const [emoji, setEmoji] = useState("⚽");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleCreate() {
-    if (!groupName.trim() || !userName.trim()) {
-      setError("Completá el nombre del grupo y el tuyo.");
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      await createGroup(groupName.trim(), userName.trim());
-      router.push("/prode");
-    } catch {
-      setError("No se pudo crear el grupo.");
-      setLoading(false);
-    }
-  }
-
-  async function handleJoin() {
-    if (!code.trim() || !userName.trim()) {
-      setError("Ingresá el código y tu nombre.");
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      await joinGroup(code.trim().toUpperCase(), userName.trim(), emoji);
-      router.push("/prode");
-    } catch (e: unknown) {
-      const status = (e as { response?: { status?: number } })?.response?.status;
-      setError(status === 404 ? "Código de grupo inválido." : "No se pudo unir al grupo.");
-      setLoading(false);
-    }
-  }
-
-  const inputCls =
-    "w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 focus:border-blue-400 focus:outline-none";
-  const btnCls =
-    "flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-60";
-
-  return (
-    <>
-      <header className="sticky top-0 z-30 border-b border-gray-100 bg-white px-4 py-3">
-        <h1 className="text-base font-semibold text-gray-900">Grupos</h1>
-      </header>
-      <main className="px-4 pb-24 pt-4">
-        {mode === "choose" && (
-          <div className="space-y-3">
-            <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
-              <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-50">
-                <Users className="h-6 w-6 text-blue-600" />
-              </span>
-              <h2 className="mt-3 text-base font-semibold text-gray-900">Jugá con tus amigos</h2>
-              <p className="mt-1 text-sm text-gray-400">Creá un grupo nuevo o unite con un código.</p>
-            </div>
-            <button onClick={() => setMode("create")} className={btnCls}>
-              <Plus className="h-4 w-4" /> Crear grupo
-            </button>
-            <button
-              onClick={() => setMode("join")}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-white py-2.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 transition-colors hover:bg-gray-50"
-            >
-              <LogIn className="h-4 w-4" /> Unirme con código
-            </button>
-          </div>
-        )}
-
-        {mode !== "choose" && (
-          <div className="space-y-4">
-            <button
-              onClick={() => {
-                setMode("choose");
-                setError(null);
-              }}
-              className="text-sm font-medium text-gray-500 transition-colors hover:text-gray-900"
-            >
-              ← Volver
-            </button>
-
-            {mode === "create" ? (
-              <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
-                <h2 className="text-sm font-semibold text-gray-900">Crear grupo</h2>
-                <input className={inputCls} placeholder="Nombre del grupo" value={groupName} onChange={(e) => setGroupName(e.target.value)} />
-                <input className={inputCls} placeholder="Tu nombre" value={userName} onChange={(e) => setUserName(e.target.value)} />
-                {error && <p className="text-xs text-red-500">{error}</p>}
-                <button onClick={handleCreate} disabled={loading} className={btnCls}>
-                  {loading ? "Creando..." : "Crear grupo"}
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
-                <h2 className="text-sm font-semibold text-gray-900">Unirme a un grupo</h2>
-                <input
-                  className={cn(inputCls, "font-mono uppercase tracking-widest")}
-                  placeholder="CÓDIGO"
-                  maxLength={6}
-                  value={code}
-                  onChange={(e) => setCode(e.target.value.toUpperCase())}
-                />
-                <input className={inputCls} placeholder="Tu nombre" value={userName} onChange={(e) => setUserName(e.target.value)} />
-                <div>
-                  <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-gray-400">Tu avatar</p>
-                  <div className="flex flex-wrap gap-2">
-                    {EMOJIS.map((e) => (
-                      <button
-                        key={e}
-                        onClick={() => setEmoji(e)}
-                        className={cn(
-                          "flex h-9 w-9 items-center justify-center rounded-full text-lg transition-colors",
-                          emoji === e ? "bg-blue-100 ring-2 ring-blue-400" : "bg-gray-100",
-                        )}
-                      >
-                        {e}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {error && <p className="text-xs text-red-500">{error}</p>}
-                <button onClick={handleJoin} disabled={loading} className={btnCls}>
-                  {loading ? "Uniéndome..." : "Unirme"}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </main>
-      <Navbar />
-    </>
-  );
-}
-
-export default function GruposPage() {
-  const token = getToken();
-  const userId = getUserId();
-  const groupId = getGroupId();
-
-  if (token && userId && groupId) {
-    return <GroupHub groupId={groupId} userId={userId} />;
-  }
-  return <CreateJoin />;
 }

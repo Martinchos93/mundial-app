@@ -1,0 +1,65 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: mundial2026_postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: mundial2026
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d mundial2026"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    container_name: mundial2026_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: mundial2026_backend
+    env_file:
+      - ./backend/.env
+    environment:
+      # Override the .env hosts so the container reaches the compose services.
+      DATABASE_URL: postgresql://user:pass@postgres:5432/mundial2026
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # NEXT_PUBLIC_* are baked at build time. The browser runs on the host,
+        # so it reaches the backend via the host-mapped port.
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+        NEXT_PUBLIC_ADMIN_TOKEN: Xd7LzDpfBxSj5bJJRhHyyBX5SC8bqmy-
+    container_name: mundial2026_frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  redisdata:

@@ -1,0 +1,560 @@
+import axios from "axios";
+import useSWR, { type SWRConfiguration } from "swr";
+import type {
+  Match,
+  AIPrediction,
+  AIResult,
+  Team,
+  Player,
+  Group,
+  Column,
+  Prediction,
+  LeaderboardEntry,
+  MatchEvent,
+  User,
+} from "@/types";
+import { getToken, getGroupId, saveAuth } from "@/lib/utils";
+import { flagFor } from "@/lib/flags";
+
+const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const adminToken = process.env.NEXT_PUBLIC_ADMIN_TOKEN || "";
+
+export const http = axios.create({ baseURL });
+
+http.interceptors.request.use((config) => {
+  const token = getToken();
+  if (token) config.headers["Authorization"] = `Bearer ${token}`;
+  if (adminToken && (config.url ?? "").startsWith("/admin")) {
+    config.headers["X-Admin-Token"] = adminToken;
+  }
+  return config;
+});
+
+// ---- Adapters: backend shapes → frontend domain types ----------------
+
+function shorten(name: string): string {
+  return name.length > 12 ? name.slice(0, 11) + "." : name;
+}
+
+function teamStub(id: number | null | undefined, name: string | null | undefined): Team {
+  const n = name || "TBD";
+  return {
+    id: id ?? 0,
+    external_id: id ?? null,
+    name: n,
+    short_name: shorten(n),
+    flag_emoji: flagFor(n),
+    logo_url: null,
+    group: null,
+    coach: null,
+  };
+}
+
+interface BackendMatch {
+  id: number;
+  home_team: string;
+  away_team: string;
+  home_team_id: number | null;
+  away_team_id: number | null;
+  kickoff_utc: string;
+  status: Match["status"];
+  minute: number | null;
+  phase: string | null;
+  venue: string | null;
+  home_score: number | null;
+  away_score: number | null;
+  home_possession: number | null;
+  away_possession: number | null;
+  home_shots: number | null;
+  away_shots: number | null;
+  home_xg: number | null;
+  away_xg: number | null;
+  home_yellows: number;
+  away_yellows: number;
+  home_reds: number;
+  away_reds: number;
+}
+
+function adaptMatch(m: BackendMatch): Match {
+  return {
+    id: m.id,
+    home_team_id: m.home_team_id ?? 0,
+    away_team_id: m.away_team_id ?? 0,
+    home_team: teamStub(m.home_team_id, m.home_team),
+    away_team: teamStub(m.away_team_id, m.away_team),
+    kickoff_at: m.kickoff_utc,
+    status: m.status,
+    minute: m.minute,
+    phase: m.phase,
+    venue: m.venue,
+    home_score: m.home_score,
+    away_score: m.away_score,
+    home_possession: m.home_possession,
+    away_possession: m.away_possession,
+    home_shots: m.home_shots,
+    away_shots: m.away_shots,
+    home_shots_on_target: null,
+    away_shots_on_target: null,
+    home_xg: m.home_xg,
+    away_xg: m.away_xg,
+    home_passes: null,
+    away_passes: null,
+    home_yellows: m.home_yellows ?? 0,
+    away_yellows: m.away_yellows ?? 0,
+    home_reds: m.home_reds ?? 0,
+    away_reds: m.away_reds ?? 0,
+    ai_prediction: null,
+    events: [],
+  };
+}
+
+const RESULT_MAP: Record<string, AIResult> = { home: "local", draw: "empate", away: "visitante" };
+
+interface BackendAI {
+  id: number;
+  match_id: number;
+  result: string;
+  score_home: number;
+  score_away: number;
+  confidence: number;
+  prob_home: number;
+  prob_draw: number;
+  prob_away: number;
+  xg_home: number;
+  xg_away: number;
+  key_players: string[];
+  factors: string[];
+  summary_text: string | null;
+  generated_at: string;
+}
+
+function adaptAI(a: BackendAI): AIPrediction {
+  return {
+    id: a.id,
+    match_id: a.match_id,
+    result: RESULT_MAP[a.result] ?? "empate",
+    suggested_score: `${a.score_home}-${a.score_away}`,
+    confidence: a.confidence,
+    prob_home: a.prob_home,
+    prob_draw: a.prob_draw,
+    prob_away: a.prob_away,
+    expected_goals_home: a.xg_home,
+    expected_goals_away: a.xg_away,
+    key_players: JSON.stringify(a.key_players ?? []),
+    decisive_factors: JSON.stringify(a.factors ?? []),
+    summary: a.summary_text ?? "",
+    generated_at: a.generated_at,
+  };
+}
+
+interface BackendScore {
+  pts_result: number;
+  pts_exact: number;
+  pts_yellows: number;
+  pts_reds: number;
+  pts_bonus: number;
+  total: number;
+}
+interface BackendPrediction {
+  id: number;
+  user_id: number;
+  match_id: number;
+  column_id: number;
+  pred_home_score: number;
+  pred_away_score: number;
+  pred_yellows: number;
+  pred_reds: number;
+  locked: boolean;
+  score: BackendScore | null;
+}
+
+function adaptPrediction(p: BackendPrediction): Prediction {
+  const s = p.score;
+  return {
+    id: p.id,
+    user_id: p.user_id,
+    match_id: p.match_id,
+    column_id: p.column_id,
+    pred_home_score: p.pred_home_score,
+    pred_away_score: p.pred_away_score,
+    pred_yellows: p.pred_yellows,
+    pred_reds: p.pred_reds,
+    pts_result: s?.pts_result ?? 0,
+    pts_goals: s?.pts_exact ?? 0,
+    pts_yellows_scored: s?.pts_yellows ?? 0,
+    pts_reds_scored: s?.pts_reds ?? 0,
+    pts_exact_score: s?.pts_bonus ?? 0,
+    total_points: s?.total ?? 0,
+    is_scored: s != null,
+    locked_at: p.locked ? "locked" : null,
+  };
+}
+
+interface BackendColumn {
+  id: number;
+  name: string;
+  status: Column["status"];
+  starts_at: string | null;
+  closes_at: string | null;
+  scoring_config: Record<string, number>;
+}
+
+function adaptColumn(c: BackendColumn): Column {
+  const cfg = c.scoring_config ?? {};
+  return {
+    id: c.id,
+    name: c.name,
+    status: c.status,
+    starts_at: c.starts_at,
+    ends_at: c.closes_at,
+    pts_result: cfg.pts_result ?? 0,
+    pts_goals: cfg.pts_exact_goals ?? 0,
+    pts_yellows: cfg.pts_yellows ?? 0,
+    pts_reds: cfg.pts_reds ?? 0,
+    pts_exact_score: cfg.pts_bonus ?? 0,
+  };
+}
+
+interface BackendLeaderEntry {
+  user_id: number;
+  name: string;
+  avatar_emoji: string;
+  points: number;
+  delta_today: number;
+  streak: number;
+  rank: number;
+}
+
+function adaptLeaderEntry(e: BackendLeaderEntry): LeaderboardEntry {
+  return {
+    rank: e.rank,
+    user_id: e.user_id,
+    name: e.name,
+    avatar_emoji: e.avatar_emoji,
+    total_points: e.points,
+    correct_results: 0,
+    exact_scores: 0,
+    delta_today: e.delta_today ?? 0,
+    streak: e.streak ?? 0,
+  };
+}
+
+// ---- Query hooks ------------------------------------------------------
+
+const hasLive = (matches?: Match[]) => !!matches?.some((m) => m.status === "live");
+
+export function useMatches(params?: { date?: string; status?: string }) {
+  const qs = new URLSearchParams({ page_size: "200" });
+  if (params?.date) qs.set("date", params.date);
+  if (params?.status) qs.set("status", params.status);
+  const key = `/matches?${qs.toString()}`;
+  const config: SWRConfiguration = {
+    refreshInterval: (latest: Match[] | undefined) => (hasLive(latest) ? 30000 : 60000),
+  };
+  return useSWR<Match[]>(
+    key,
+    (url: string) => http.get(url).then((r) => (r.data.items ?? []).map(adaptMatch)),
+    config,
+  );
+}
+
+export function useMatch(id: string | number | null) {
+  return useSWR<Match>(
+    id ? `/matches/${id}` : null,
+    async (url: string) => {
+      const [matchRes, eventsRes] = await Promise.all([
+        http.get(url),
+        http.get(`${url}/events`).catch(() => ({ data: [] as MatchEvent[] })),
+      ]);
+      const match = adaptMatch(matchRes.data);
+      match.events = (eventsRes.data ?? []).map((e: Partial<MatchEvent>, i: number) => ({
+        id: i,
+        match_id: match.id,
+        type: (e.type as MatchEvent["type"]) ?? "Goal",
+        minute: e.minute ?? 0,
+        team_id: 0,
+        player_name: (e as { player?: string }).player ?? e.player_name ?? "",
+        detail: e.detail ?? null,
+      }));
+      return match;
+    },
+    { refreshInterval: (latest: Match | undefined) => (latest?.status === "live" ? 30000 : 0) },
+  );
+}
+
+export function useAIPrediction(matchId: string | number | null) {
+  return useSWR<AIPrediction>(
+    matchId ? `/ai/match/${matchId}` : null,
+    (url: string) => http.get(url).then((r) => adaptAI(r.data)),
+    { shouldRetryOnError: false },
+  );
+}
+
+export function useStandings() {
+  return useSWR<Team[]>("/standings", (url: string) =>
+    http.get(url).then((r) =>
+      (r.data.items ?? []).map((t: Team) => ({ ...t, flag_emoji: flagFor(t.name) })),
+    ),
+  );
+}
+
+export function useTeam(id: string | number | null) {
+  const { data, error, isLoading } = useSWR(
+    id ? `/teams/${id}` : null,
+    async (url: string) => {
+      const [teamRes, matchesRes] = await Promise.all([
+        http.get(url),
+        http.get(`${url}/matches`).catch(() => ({ data: { items: [] } })),
+      ]);
+      return { team: teamRes.data, matches: matchesRes.data.items ?? [] };
+    },
+  );
+
+  const raw = data?.team;
+  const stats = raw?.statistics ?? {};
+  const name = raw?.team?.team?.name ?? raw?.team?.name ?? "";
+  const team: Team | undefined = raw
+    ? {
+        id: Number(id),
+        external_id: Number(id),
+        name,
+        short_name: shorten(name),
+        flag_emoji: flagFor(name),
+        logo_url: raw?.team?.team?.logo ?? null,
+        group: null,
+        coach: null,
+        goals_for: stats?.goals?.for?.total?.total ?? undefined,
+        goals_against: stats?.goals?.against?.total?.total ?? undefined,
+        xg_for: 0,
+        possession: 0,
+        form: stats?.form,
+        players: [],
+      }
+    : undefined;
+
+  const recentMatches: Match[] = (data?.matches ?? []).map(adaptApiFixture);
+  return { team, recentMatches, error, isLoading };
+}
+
+interface ApiFixture {
+  fixture?: { id?: number; date?: string; status?: { short?: string } };
+  teams?: { home?: { id?: number; name?: string }; away?: { id?: number; name?: string } };
+  goals?: { home?: number | null; away?: number | null };
+}
+
+function adaptApiFixture(fx: ApiFixture): Match {
+  const short = fx.fixture?.status?.short ?? "NS";
+  const status: Match["status"] = ["FT", "AET", "PEN"].includes(short)
+    ? "finished"
+    : ["1H", "2H", "HT", "ET", "LIVE"].includes(short)
+      ? "live"
+      : "scheduled";
+  return {
+    ...teamStubMatch(),
+    id: fx.fixture?.id ?? 0,
+    home_team: teamStub(fx.teams?.home?.id, fx.teams?.home?.name),
+    away_team: teamStub(fx.teams?.away?.id, fx.teams?.away?.name),
+    home_team_id: fx.teams?.home?.id ?? 0,
+    away_team_id: fx.teams?.away?.id ?? 0,
+    kickoff_at: fx.fixture?.date ?? new Date().toISOString(),
+    status,
+    home_score: fx.goals?.home ?? null,
+    away_score: fx.goals?.away ?? null,
+  };
+}
+
+function teamStubMatch(): Match {
+  return {
+    id: 0,
+    home_team_id: 0,
+    away_team_id: 0,
+    home_team: teamStub(0, "TBD"),
+    away_team: teamStub(0, "TBD"),
+    kickoff_at: new Date().toISOString(),
+    status: "scheduled",
+    minute: null,
+    phase: null,
+    venue: null,
+    home_score: null,
+    away_score: null,
+    home_possession: null,
+    away_possession: null,
+    home_shots: null,
+    away_shots: null,
+    home_shots_on_target: null,
+    away_shots_on_target: null,
+    home_xg: null,
+    away_xg: null,
+    home_passes: null,
+    away_passes: null,
+    home_yellows: 0,
+    away_yellows: 0,
+    home_reds: 0,
+    away_reds: 0,
+    ai_prediction: null,
+    events: [],
+  };
+}
+
+export function usePlayer(id: string | number | null) {
+  return useSWR<Player>(id ? `/players/${id}` : null, async (url: string) => {
+    const res = await http.get(url);
+    const p = res.data.player ?? {};
+    const info = p.player ?? {};
+    const st = (p.statistics ?? [])[0] ?? {};
+    return {
+      id: Number(id),
+      team_id: st?.team?.id ?? 0,
+      name: info.name ?? "Jugador",
+      position: st?.games?.position ?? "",
+      number: st?.games?.number ?? null,
+      age: info.age ?? null,
+      nationality: info.nationality ?? null,
+      photo_url: info.photo ?? null,
+      goals: st?.goals?.total ?? 0,
+      assists: st?.goals?.assists ?? 0,
+      yellow_cards: st?.cards?.yellow ?? 0,
+      red_cards: st?.cards?.red ?? 0,
+      minutes_played: st?.games?.minutes ?? 0,
+      rating: st?.games?.rating ? parseFloat(st.games.rating) : null,
+      xg: null,
+    } as Player;
+  });
+}
+
+export function useGroup(groupId: string | number | null) {
+  return useSWR<Group>(groupId ? `/groups/${groupId}` : null, (url: string) =>
+    http.get(url).then((r) => r.data as Group),
+  );
+}
+
+export function useGroupColumns(groupId: string | number | null) {
+  return useSWR<Column[]>(groupId ? `/groups/${groupId}/columns` : null, (url: string) =>
+    http.get(url).then((r) => (r.data ?? []).map(adaptColumn)),
+  );
+}
+
+export function useAdminColumns() {
+  return useSWR<Column[]>("/admin/columns", (url: string) =>
+    http.get(url).then((r) => (r.data ?? []).map(adaptColumn)),
+  );
+}
+
+export function useLeaderboard(groupId: string | number | null) {
+  return useSWR<LeaderboardEntry[]>(
+    groupId ? `/groups/${groupId}/leaderboard` : null,
+    (url: string) => http.get(url).then((r) => (r.data.entries ?? []).map(adaptLeaderEntry)),
+    { refreshInterval: 60000 },
+  );
+}
+
+export function usePredictions() {
+  const token = getToken();
+  return useSWR<Prediction[]>(token ? "/predictions" : null, (url: string) =>
+    http.get(url).then((r) => (r.data ?? []).map(adaptPrediction)),
+  );
+}
+
+/** Resolve the group's active column (reactive). */
+export function useActiveColumnId(): number | null {
+  const { data: columns } = useGroupColumns(getGroupId());
+  if (!columns || columns.length === 0) return null;
+  const active = columns.find((c) => c.status === "active") ?? columns[0];
+  return active?.id ?? null;
+}
+
+// ---- Mutations --------------------------------------------------------
+
+export async function generateAIPrediction(matchId: string | number): Promise<AIPrediction> {
+  const res = await http.get(`/ai/match/${matchId}?force=true`);
+  return adaptAI(res.data);
+}
+
+export interface SubmitPredictionBody {
+  match_id: number;
+  column_id: number;
+  pred_home_score: number;
+  pred_away_score: number;
+  pred_yellows: number;
+  pred_reds: number;
+}
+
+export async function submitPrediction(body: SubmitPredictionBody): Promise<Prediction> {
+  const res = await http.post(`/predictions`, body);
+  return adaptPrediction(res.data);
+}
+
+export async function createGroup(
+  name: string,
+  userName: string,
+): Promise<{ data: Group; user: User }> {
+  const res = await http.post(`/auth/create-group`, {
+    name: userName,
+    avatar_emoji: "⚽",
+    group_name: name,
+  });
+  const { token, user, invite_code } = res.data;
+  saveAuth(token, user.id, user.group_id, invite_code);
+  return { data: { id: user.group_id, name, invite_code }, user };
+}
+
+export async function joinGroup(
+  code: string,
+  userName: string,
+  avatarEmoji: string,
+): Promise<{ data: User; group: Group }> {
+  const res = await http.post(`/auth/join`, {
+    name: userName,
+    avatar_emoji: avatarEmoji,
+    invite_code: code,
+  });
+  const { token, user, invite_code } = res.data;
+  saveAuth(token, user.id, user.group_id, invite_code);
+  return { data: user, group: { id: user.group_id, name: "", invite_code } };
+}
+
+export interface CreateColumnBody {
+  name: string;
+  pts_result: number;
+  pts_goals: number;
+  pts_yellows: number;
+  pts_reds: number;
+  pts_exact_score: number;
+  group_ids: number[];
+}
+
+export async function createColumn(body: CreateColumnBody): Promise<Column> {
+  const res = await http.post(`/admin/columns`, {
+    name: body.name,
+    group_ids: body.group_ids,
+    match_ids: [],
+    scoring_config: {
+      pts_result: body.pts_result,
+      pts_exact_goals: body.pts_goals,
+      pts_yellows: body.pts_yellows,
+      pts_reds: body.pts_reds,
+      pts_bonus: body.pts_exact_score,
+    },
+  });
+  return adaptColumn(res.data);
+}
+
+export async function updateColumn(
+  id: number,
+  body: { status?: string; name?: string },
+): Promise<Column> {
+  if (body.status === "active") {
+    const res = await http.post(`/admin/columns/${id}/activate`);
+    return adaptColumn(res.data);
+  }
+  if (body.status === "closed") {
+    const res = await http.post(`/admin/columns/${id}/close`);
+    return adaptColumn(res.data);
+  }
+  const res = await http.put(`/admin/columns/${id}`, { name: body.name });
+  return adaptColumn(res.data);
+}
+
+export async function recalculateColumn(id: number): Promise<void> {
+  await http.post(`/admin/columns/${id}/recalculate`);
+}

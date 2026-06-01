@@ -1,0 +1,112 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import Navbar from "@/components/layout/Navbar";
+import MatchCard from "@/components/match/MatchCard";
+import PredictionForm from "@/components/prode/PredictionForm";
+import { useGroup, useMatches, usePredictions, useActiveColumnId } from "@/lib/api";
+import { getToken, getGroupId } from "@/lib/utils";
+import type { Match } from "@/types";
+
+function NoSession() {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
+      <span className="text-5xl">🏆</span>
+      <h1 className="mt-4 text-lg font-semibold text-gray-900">Unite a un grupo</h1>
+      <p className="mt-1 text-sm text-gray-400">Creá o unite a un grupo para empezar a predecir.</p>
+      <Link
+        href="/grupos"
+        className="mt-5 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+      >
+        Ir a Grupos
+      </Link>
+    </div>
+  );
+}
+
+export default function ProdePage() {
+  const token = getToken();
+  const groupId = getGroupId();
+  const columnId = useActiveColumnId();
+
+  const [selected, setSelected] = useState<Match | null>(null);
+
+  const { data: group } = useGroup(groupId);
+  const { data: matches, isLoading } = useMatches();
+  const { data: predictions, mutate: mutatePreds } = usePredictions();
+
+  if (!token || !groupId) return <NoSession />;
+
+  const findPred = (matchId: number) => predictions?.find((p) => p.match_id === matchId);
+  const upcoming = (matches ?? []).filter((m) => m.status === "scheduled");
+  const resolved = (matches ?? []).filter((m) => m.status === "finished" && findPred(m.id));
+
+  if (selected) {
+    return (
+      <>
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-gray-100 bg-white px-4 py-3">
+          <button
+            onClick={() => setSelected(null)}
+            className="flex items-center gap-1 text-[13px] text-gray-500 transition-colors hover:text-gray-900"
+          >
+            <ArrowLeft className="h-4 w-4" /> Volver
+          </button>
+          <span className="text-xs text-gray-400">
+            {selected.home_team?.short_name || selected.home_team?.name} vs{" "}
+            {selected.away_team?.short_name || selected.away_team?.name}
+          </span>
+        </header>
+        <main className="space-y-2 px-4 pb-24 pt-3">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Tu predicción</p>
+          <PredictionForm
+            match={selected}
+            existing={findPred(selected.id)}
+            columnId={columnId}
+            onSaved={() => mutatePreds()}
+          />
+        </main>
+        <Navbar />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <header className="sticky top-0 z-30 border-b border-gray-100 bg-white px-4 py-3">
+        <h1 className="text-base font-semibold text-gray-900">{group?.name ?? "Prode"}</h1>
+        <p className="text-[11px] text-gray-400">Predecí los próximos partidos</p>
+      </header>
+
+      <main className="px-4 pb-24 pt-3">
+        {isLoading && <div className="h-28 animate-pulse rounded-xl border border-gray-200 bg-white" />}
+
+        <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-gray-400">Por predecir</p>
+        <div className="space-y-2">
+          {upcoming.length === 0 && (
+            <p className="py-6 text-center text-sm text-gray-400">No hay partidos por predecir.</p>
+          )}
+          {upcoming.map((m) => (
+            <MatchCard key={m.id} match={m} prediction={findPred(m.id)} showPrediction onSelect={setSelected} />
+          ))}
+        </div>
+
+        {resolved.length > 0 && (
+          <>
+            <p className="mb-2 mt-5 text-[11px] font-medium uppercase tracking-wider text-gray-400">
+              Finalizados
+            </p>
+            <div className="space-y-2">
+              {resolved.map((m) => (
+                <PredictionForm key={m.id} match={m} existing={findPred(m.id)} />
+              ))}
+            </div>
+          </>
+        )}
+      </main>
+
+      <Navbar />
+    </>
+  );
+}

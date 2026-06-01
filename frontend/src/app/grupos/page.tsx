@@ -109,6 +109,7 @@ export default function GruposPage() {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -142,11 +143,18 @@ export default function GruposPage() {
   }
   async function doJoin() {
     if (!code.trim()) return;
-    setBusy(true); setErr(null);
+    setBusy(true); setErr(null); setOk(null);
     try {
-      await joinProde(code.trim());
+      const r = await joinProde(code.trim());
       setCode(""); setMode("none");
-      mutate();
+      await mutate();
+      setSelectedGroupId(r.group_id);
+      setSelected(r.group_id);
+      setOk(
+        r.status === "active"
+          ? "¡Te uniste al prode!"
+          : "✅ Solicitud enviada. Esperá que el creador te acepte.",
+      );
     } catch (e: unknown) {
       setErr((e as { response?: { status?: number } })?.response?.status === 404 ? "Código inválido." : "No se pudo unir.");
     } finally { setBusy(false); }
@@ -193,9 +201,23 @@ export default function GruposPage() {
           </div>
         )}
         {err && <p className="mb-2 text-xs text-red-500">{err}</p>}
+        {ok && <p className="mb-2 rounded-lg bg-green-50 px-3 py-2 text-xs text-green-700">{ok}</p>}
 
         <div className="space-y-2">
-          {me?.memberships.length === 0 && <p className="rounded-xl border border-gray-200 bg-white p-5 text-center text-sm text-gray-400">Todavía no estás en ningún prode. Creá uno o unite con un código.</p>}
+          {me?.memberships.length === 0 && (
+            <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
+              <span className="text-3xl">🏆</span>
+              <p className="mt-2 text-sm text-gray-500">Todavía no estás en ningún prode.</p>
+              <div className="mt-4 flex flex-col gap-2">
+                <button onClick={() => setMode("join")} className="rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700">
+                  Unirme a un prode con código
+                </button>
+                <button onClick={() => setMode("create")} className="rounded-lg border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                  Crear un prode nuevo
+                </button>
+              </div>
+            </div>
+          )}
           {me?.memberships.map((m) => (
             <button
               key={m.group_id}

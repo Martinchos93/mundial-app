@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import MatchCard from "@/components/match/MatchCard";
 import PredictionForm from "@/components/prode/PredictionForm";
+import TopScorerCard from "@/components/prode/TopScorerCard";
 import { useMatches, usePredictions, useActiveColumnId, useMe } from "@/lib/api";
 import { getToken, getSelectedGroupId } from "@/lib/utils";
 import type { Match } from "@/types";
@@ -97,6 +98,8 @@ export default function ProdePage() {
       </header>
 
       <main className="px-4 pb-24 pt-3">
+        <TopScorerCard columnId={columnId} />
+
         {isLoading && <div className="h-28 animate-pulse rounded-xl border border-gray-200 bg-white" />}
 
         <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-gray-400">Por predecir</p>

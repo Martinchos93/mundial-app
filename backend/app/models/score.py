@@ -17,6 +17,8 @@ class Score(Base):
     pts_yellows: Mapped[int] = mapped_column(Integer, default=0)
     pts_reds: Mapped[int] = mapped_column(Integer, default=0)
     pts_bonus: Mapped[int] = mapped_column(Integer, default=0)
+    pts_scorers: Mapped[int] = mapped_column(Integer, default=0)
+    pts_cards: Mapped[int] = mapped_column(Integer, default=0)
     total: Mapped[int] = mapped_column(Integer, default=0, index=True)
 
     prediction: Mapped["Prediction"] = relationship(back_populates="score")  # noqa: F821

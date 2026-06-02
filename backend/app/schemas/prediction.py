@@ -10,6 +10,9 @@ class PredictionCreate(BaseModel):
     pred_away_score: int = Field(..., ge=0, le=30)
     pred_yellows: int = Field(default=0, ge=0, le=50)
     pred_reds: int = Field(default=0, ge=0, le=20)
+    # Optional player picks (names). Capped to keep the prode fair.
+    pred_scorers: list[str] = Field(default_factory=list, max_length=5)
+    pred_cards: list[str] = Field(default_factory=list, max_length=5)
 
 
 class ScoreOut(BaseModel):
@@ -18,6 +21,8 @@ class ScoreOut(BaseModel):
     pts_yellows: int = 0
     pts_reds: int = 0
     pts_bonus: int = 0
+    pts_scorers: int = 0
+    pts_cards: int = 0
     total: int = 0
 
     model_config = {"from_attributes": True}
@@ -32,6 +37,8 @@ class PredictionOut(BaseModel):
     pred_away_score: int
     pred_yellows: int
     pred_reds: int
+    pred_scorers: list[str] = Field(default_factory=list)
+    pred_cards: list[str] = Field(default_factory=list)
     submitted_at: datetime
     locked: bool
     score: ScoreOut | None = None
@@ -48,3 +55,18 @@ class GroupPredictionEntry(BaseModel):
     pred_yellows: int
     pred_reds: int
     total: int = 0
+
+
+class TopScorerCreate(BaseModel):
+    column_id: int
+    player_name: str = Field(..., min_length=1, max_length=120)
+    team_name: str | None = None
+
+
+class TopScorerOut(BaseModel):
+    column_id: int
+    pick: str | None = None  # the current user's pick
+    team_name: str | None = None
+    leader: dict | None = None  # {name, goals} current tournament leader
+    finished: bool = False  # whether the tournament is over (points awarded)
+    points_value: int = 10

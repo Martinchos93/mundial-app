@@ -103,6 +103,8 @@ export interface Match {
   away_yellows: number;
   home_reds: number;
   away_reds: number;
+  scorers?: string[];
+  booked?: string[];
   ai_prediction?: AIPrediction | null;
   events?: MatchEvent[];
 }
@@ -166,11 +168,15 @@ export interface Prediction {
   pred_away_score: number;
   pred_yellows: number;
   pred_reds: number;
+  pred_scorers: string[];
+  pred_cards: string[];
   pts_result: number;
   pts_goals: number;
   pts_yellows_scored: number;
   pts_reds_scored: number;
   pts_exact_score: number;
+  pts_scorers: number;
+  pts_cards: number;
   total_points: number;
   is_scored: boolean;
   locked_at: string | null;

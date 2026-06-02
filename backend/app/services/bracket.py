@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import random
 
+from collections import Counter
+
 from sqlalchemy.orm import Session
 
-from app.models import Match
+from app.models import Match, Player
 from app.seed_2026 import label_for_source
 
 GROUP_LETTERS = list("ABCDEFGHIJKL")
@@ -215,9 +217,68 @@ def _cards() -> tuple[int, int]:
     return yellows, reds
 
 
-def _book(m: Match) -> None:
+# Likelihood a player scores / gets booked, by position. Forwards score most;
+# defenders/keepers get booked relatively more.
+_SCORE_W = {"FW": 6, "Attacker": 6, "MF": 3, "Midfielder": 3, "DF": 1, "Defender": 1, "GK": 0, "Goalkeeper": 0}
+_CARD_W = {"DF": 4, "Defender": 4, "MF": 3, "Midfielder": 3, "FW": 2, "Attacker": 2, "GK": 1, "Goalkeeper": 1}
+
+
+def _squad(db: Session, team: str) -> list[Player]:
+    return db.query(Player).filter(Player.team_name == team).all()
+
+
+def _weighted_names(players: list[Player], weights: dict[str, int], n: int, distinct: bool) -> list[str]:
+    """Pick n player names weighted by position. distinct=True avoids repeats."""
+    pool = [(p.name, max(0, weights.get(p.position or "", 1))) for p in players if p.name]
+    pool = [(name, w) for name, w in pool if w > 0]
+    if not pool or n <= 0:
+        return []
+    picks: list[str] = []
+    used: set[str] = set()
+    for _ in range(n):
+        choices = [(nm, w) for nm, w in pool if not (distinct and nm in used)]
+        if not choices:
+            break
+        names, ws = zip(*choices)
+        nm = random.choices(names, weights=ws)[0]
+        picks.append(nm)
+        used.add(nm)
+    return picks
+
+
+def _book(db: Session, m: Match) -> None:
+    """Assign team-level card counts AND the specific players booked + scorers."""
     m.home_yellows, m.home_reds = _cards()
     m.away_yellows, m.away_reds = _cards()
+
+    home_sq, away_sq = _squad(db, m.home_team), _squad(db, m.away_team)
+
+    # Goalscorers: one name per goal, weighted toward forwards (repeats = braces).
+    scorers = _weighted_names(home_sq, _SCORE_W, m.home_score or 0, distinct=False)
+    scorers += _weighted_names(away_sq, _SCORE_W, m.away_score or 0, distinct=False)
+    m.scorers = scorers
+
+    # Booked: distinct players, one per card (yellow or red).
+    booked = _weighted_names(home_sq, _CARD_W, (m.home_yellows or 0) + (m.home_reds or 0), distinct=True)
+    booked += _weighted_names(away_sq, _CARD_W, (m.away_yellows or 0) + (m.away_reds or 0), distinct=True)
+    m.booked = booked
+
+
+def tournament_top_scorer(db: Session) -> dict | None:
+    """Most-scoring player across all finished matches: {name, goals} or None."""
+    tally: Counter[str] = Counter()
+    for m in db.query(Match).filter(Match.status == "finished").all():
+        for name in (m.scorers or []):
+            tally[name] += 1
+    if not tally:
+        return None
+    name, goals = tally.most_common(1)[0]
+    return {"name": name, "goals": goals}
+
+
+def is_tournament_finished(db: Session) -> bool:
+    final = db.query(Match).filter(Match.match_no == 104).one_or_none()
+    return bool(final and final.status == "finished")
 
 
 def simulate(db: Session) -> dict:
@@ -230,7 +291,7 @@ def simulate(db: Session) -> dict:
     # 1) Group stage
     for m in db.query(Match).filter(Match.phase.ilike("Grupo %")).all():
         m.home_score, m.away_score = _play(m.home_team, m.away_team, allow_draw=True)
-        _book(m)
+        _book(db, m)
         m.status = "finished"
     db.commit()
     resolve(db)
@@ -244,7 +305,7 @@ def simulate(db: Session) -> dict:
         if "°" in m.away_team or "Ganador" in m.away_team or "Perdedor" in m.away_team:
             continue
         m.home_score, m.away_score = _play(m.home_team, m.away_team, allow_draw=False)
-        _book(m)
+        _book(db, m)
         m.status = "finished"
         db.commit()
     resolve(db)

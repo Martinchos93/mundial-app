@@ -32,6 +32,8 @@ class MatchOut(MatchBase):
     away_possession: float | None = None
     home_shots: int | None = None
     away_shots: int | None = None
+    scorers: list[str] | None = None
+    booked: list[str] | None = None
 
 
 class MatchLive(BaseModel):

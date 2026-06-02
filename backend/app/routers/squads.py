@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -39,6 +40,31 @@ def squad(team_name: str, db: Session = Depends(get_db)):
             }
             for p in players
         ],
+    }
+
+
+@router.get("/players-search")
+def search_players(q: str = Query(default="", min_length=0), limit: int = 20, db: Session = Depends(get_db)):
+    """Search players by name (for the top-scorer picker). Forwards ranked first."""
+    query = db.query(Player)
+    term = q.strip()
+    if term:
+        like = f"%{term}%"
+        query = query.filter(or_(Player.name.ilike(like), Player.team_name.ilike(like)))
+    players = query.limit(200).all()
+    fwd = {"FW": 0, "Attacker": 0, "MF": 1, "Midfielder": 1}
+    players.sort(key=lambda p: (fwd.get(p.position or "", 2), p.name or ""))
+    return {
+        "players": [
+            {
+                "id": p.id,
+                "name": p.name,
+                "team": p.team_name,
+                "position": p.position,
+                "photo_url": p.photo_url,
+            }
+            for p in players[: max(1, min(limit, 50))]
+        ]
     }
 
 

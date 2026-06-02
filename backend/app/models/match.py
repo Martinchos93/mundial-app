@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import String, DateTime, Integer, Float, func
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -39,6 +39,12 @@ class Match(Base):
     away_yellows: Mapped[int] = mapped_column(Integer, default=0)
     home_reds: Mapped[int] = mapped_column(Integer, default=0)
     away_reds: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Player-level events (names). `scorers` may repeat for a brace; `booked`
+    # is the distinct set of players who saw a yellow/red. Used to score
+    # per-match goalscorer/card predictions and the tournament top scorer.
+    scorers: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
+    booked: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
 
     home_xg: Mapped[float | None] = mapped_column(Float, nullable=True)
     away_xg: Mapped[float | None] = mapped_column(Float, nullable=True)

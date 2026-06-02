@@ -5,8 +5,9 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Group, User, Prediction, Score, Match, Membership
+from app.models import Group, User, Prediction, Score, Match, Membership, Column, TopScorerPrediction
 from app.schemas.group import Leaderboard, LeaderboardEntry
+from app.services.bracket import tournament_top_scorer, is_tournament_finished
 
 router = APIRouter(prefix="/groups", tags=["leaderboard"])
 
@@ -34,6 +35,32 @@ def _build_leaderboard(db: Session, group_id: int, only_today: bool) -> list[Lea
         q = q.filter(Match.kickoff_utc >= start)
 
     points_by_user = {uid: int(total) for uid, total in q.all()}
+
+    # Tournament top-scorer bonus (awarded once the final is played). "Today"
+    # views exclude it — it's a tournament-long prize, not a daily delta.
+    if not only_today and is_tournament_finished(db):
+        leader = tournament_top_scorer(db)
+        if leader:
+            user_ids = [u.id for u in users]
+            col_ids = [
+                c.id
+                for c in db.query(Column).filter(Column.group_ids.any(group_id)).all()
+            ]
+            if col_ids:
+                target = leader["name"].strip().casefold()
+                picks = (
+                    db.query(TopScorerPrediction)
+                    .filter(
+                        TopScorerPrediction.column_id.in_(col_ids),
+                        TopScorerPrediction.user_id.in_(user_ids),
+                    )
+                    .all()
+                )
+                for p in picks:
+                    if (p.player_name or "").strip().casefold() == target:
+                        col = db.get(Column, p.column_id)
+                        bonus = int((col.scoring_config or {}).get("pts_top_scorer", 10)) if col else 10
+                        points_by_user[p.user_id] = points_by_user.get(p.user_id, 0) + bonus
 
     entries = [
         LeaderboardEntry(

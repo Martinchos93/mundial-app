@@ -1,6 +1,7 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, Boolean, ForeignKey, UniqueConstraint, func
+from sqlalchemy import String, DateTime, Integer, Boolean, ForeignKey, UniqueConstraint, func
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -21,6 +22,10 @@ class Prediction(Base):
     pred_away_score: Mapped[int] = mapped_column(Integer, nullable=False)
     pred_yellows: Mapped[int] = mapped_column(Integer, default=0)
     pred_reds: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Optional player-level predictions (names). Empty/None = no pick, no points.
+    pred_scorers: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
+    pred_cards: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
 
     submitted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

@@ -14,6 +14,9 @@ DEFAULT_SCORING_CONFIG: dict = {
     "pts_yellows": 1,
     "pts_reds": 1,
     "pts_bonus": 3,  # awarded when result + exact total goals are both correct
+    "pts_scorer": 3,  # per correctly predicted goalscorer in a match
+    "pts_card": 2,  # per correctly predicted booked player in a match
+    "pts_top_scorer": 10,  # correctly predicting the tournament top scorer
 }
 
 

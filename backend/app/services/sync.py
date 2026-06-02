@@ -156,6 +156,8 @@ def recalculate_match_scores(db: Session, match: Match) -> int:
         score.pts_yellows = breakdown.pts_yellows
         score.pts_reds = breakdown.pts_reds
         score.pts_bonus = breakdown.pts_bonus
+        score.pts_scorers = breakdown.pts_scorers
+        score.pts_cards = breakdown.pts_cards
         score.total = breakdown.total
         if pred.score is None:
             db.add(score)

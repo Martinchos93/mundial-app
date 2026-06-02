@@ -118,7 +118,39 @@ def test_default_config_values():
         "pts_yellows": 1,
         "pts_reds": 1,
         "pts_bonus": 3,
+        "pts_scorer": 3,
+        "pts_card": 2,
+        "pts_top_scorer": 10,
     }
+
+
+def test_scorers_per_hit():
+    # 2 picks, 1 of them actually scored -> +3 (one hit). Result also wrong.
+    b = score(
+        pred_home=1, pred_away=0, actual_home=0, actual_away=2,
+        pred_scorers=["Mbappe", "Giroud"], actual_scorers=["Mbappe", "Dembele"],
+    )
+    assert b.pts_scorers == 3
+    assert b.total == 3
+
+
+def test_scorers_picking_everyone_is_capped():
+    # 7 picks (>MAX_PICKS=5); only the first 5 distinct count. 3 of first 5 hit.
+    picks = ["a", "b", "c", "d", "e", "x", "y"]
+    actual = ["a", "c", "e", "x", "y"]  # x,y are beyond the cap -> not counted
+    b = score(pred_scorers=picks, actual_scorers=actual)
+    assert b.pts_scorers == 3 * 3  # a, c, e
+
+
+def test_cards_per_hit_and_case_insensitive():
+    b = score(pred_cards=["Messi"], actual_booked=["messi"])
+    assert b.pts_cards == 2
+
+
+def test_no_picks_no_points():
+    b = score(pred_scorers=[], pred_cards=[], actual_scorers=["x"], actual_booked=["y"])
+    assert b.pts_scorers == 0
+    assert b.pts_cards == 0
 
 
 @pytest.mark.parametrize(

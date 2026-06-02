@@ -8,6 +8,7 @@ from app.models.score import Score
 from app.models.ai_prediction import AIPrediction
 from app.models.news import News
 from app.models.player import Player
+from app.models.top_scorer_prediction import TopScorerPrediction
 
 __all__ = [
     "Group",
@@ -20,4 +21,5 @@ __all__ = [
     "AIPrediction",
     "News",
     "Player",
+    "TopScorerPrediction",
 ]

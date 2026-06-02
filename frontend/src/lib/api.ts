@@ -70,6 +70,8 @@ interface BackendMatch {
   away_yellows: number;
   home_reds: number;
   away_reds: number;
+  scorers: string[] | null;
+  booked: string[] | null;
 }
 
 function adaptMatch(m: BackendMatch): Match {
@@ -100,6 +102,8 @@ function adaptMatch(m: BackendMatch): Match {
     away_yellows: m.away_yellows ?? 0,
     home_reds: m.home_reds ?? 0,
     away_reds: m.away_reds ?? 0,
+    scorers: m.scorers ?? [],
+    booked: m.booked ?? [],
     ai_prediction: null,
     events: [],
   };
@@ -150,6 +154,8 @@ interface BackendScore {
   pts_yellows: number;
   pts_reds: number;
   pts_bonus: number;
+  pts_scorers: number;
+  pts_cards: number;
   total: number;
 }
 interface BackendPrediction {
@@ -161,6 +167,8 @@ interface BackendPrediction {
   pred_away_score: number;
   pred_yellows: number;
   pred_reds: number;
+  pred_scorers: string[] | null;
+  pred_cards: string[] | null;
   locked: boolean;
   score: BackendScore | null;
 }
@@ -176,11 +184,15 @@ function adaptPrediction(p: BackendPrediction): Prediction {
     pred_away_score: p.pred_away_score,
     pred_yellows: p.pred_yellows,
     pred_reds: p.pred_reds,
+    pred_scorers: p.pred_scorers ?? [],
+    pred_cards: p.pred_cards ?? [],
     pts_result: s?.pts_result ?? 0,
     pts_goals: s?.pts_exact ?? 0,
     pts_yellows_scored: s?.pts_yellows ?? 0,
     pts_reds_scored: s?.pts_reds ?? 0,
     pts_exact_score: s?.pts_bonus ?? 0,
+    pts_scorers: s?.pts_scorers ?? 0,
+    pts_cards: s?.pts_cards ?? 0,
     total_points: s?.total ?? 0,
     is_scored: s != null,
     locked_at: p.locked ? "locked" : null,
@@ -493,11 +505,57 @@ export interface SubmitPredictionBody {
   pred_away_score: number;
   pred_yellows: number;
   pred_reds: number;
+  pred_scorers?: string[];
+  pred_cards?: string[];
 }
 
 export async function submitPrediction(body: SubmitPredictionBody): Promise<Prediction> {
   const res = await http.post(`/predictions`, body);
   return adaptPrediction(res.data);
+}
+
+// ---- Prode al goleador (tournament top scorer) --------------------------
+
+export interface TopScorerState {
+  column_id: number;
+  pick: string | null;
+  team_name: string | null;
+  leader: { name: string; goals: number } | null;
+  finished: boolean;
+  points_value: number;
+}
+
+export function useTopScorer(columnId: number | null) {
+  return useSWR<TopScorerState>(
+    columnId ? `/predictions/top-scorer?column_id=${columnId}` : null,
+    (url: string) => http.get(url).then((r) => r.data as TopScorerState),
+  );
+}
+
+export async function submitTopScorer(
+  columnId: number,
+  playerName: string,
+  teamName?: string | null,
+): Promise<TopScorerState> {
+  const res = await http.post(`/predictions/top-scorer`, {
+    column_id: columnId,
+    player_name: playerName,
+    team_name: teamName ?? null,
+  });
+  return res.data as TopScorerState;
+}
+
+export interface PlayerSearchResult {
+  id: number;
+  name: string;
+  team: string;
+  position: string | null;
+  photo_url: string | null;
+}
+
+export async function searchPlayers(q: string): Promise<PlayerSearchResult[]> {
+  const res = await http.get(`/players-search`, { params: { q, limit: 20 } });
+  return (res.data?.players ?? []) as PlayerSearchResult[];
 }
 
 // ---- Account auth -------------------------------------------------------

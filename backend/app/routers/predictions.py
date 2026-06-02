@@ -6,8 +6,15 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.deps import get_current_user
-from app.models import User, Match, Column, Prediction, Membership
-from app.schemas.prediction import PredictionCreate, PredictionOut, GroupPredictionEntry
+from app.models import User, Match, Column, Prediction, Membership, TopScorerPrediction
+from app.schemas.prediction import (
+    PredictionCreate,
+    PredictionOut,
+    GroupPredictionEntry,
+    TopScorerCreate,
+    TopScorerOut,
+)
+from app.services.bracket import tournament_top_scorer, is_tournament_finished
 
 
 def _active_member(db: Session, user_id: int, group_ids: list[int]) -> bool:
@@ -87,9 +94,82 @@ def upsert_prediction(
     pred.pred_away_score = payload.pred_away_score
     pred.pred_yellows = payload.pred_yellows
     pred.pred_reds = payload.pred_reds
+    # Dedupe + cap player picks (None when empty so the column stays clean).
+    pred.pred_scorers = list(dict.fromkeys(payload.pred_scorers))[:5] or None
+    pred.pred_cards = list(dict.fromkeys(payload.pred_cards))[:5] or None
     db.commit()
     db.refresh(pred)
     return PredictionOut.model_validate(pred)
+
+
+# ---- Prode al goleador (tournament top scorer) -------------------------
+
+@router.get("/top-scorer", response_model=TopScorerOut)
+def get_top_scorer(
+    column_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    pick = (
+        db.query(TopScorerPrediction)
+        .filter(
+            TopScorerPrediction.user_id == current_user.id,
+            TopScorerPrediction.column_id == column_id,
+        )
+        .one_or_none()
+    )
+    col = db.get(Column, column_id)
+    cfg = (col.scoring_config if col else None) or {}
+    return TopScorerOut(
+        column_id=column_id,
+        pick=pick.player_name if pick else None,
+        team_name=pick.team_name if pick else None,
+        leader=tournament_top_scorer(db),
+        finished=is_tournament_finished(db),
+        points_value=int(cfg.get("pts_top_scorer", 10)),
+    )
+
+
+@router.post("/top-scorer", response_model=TopScorerOut)
+def set_top_scorer(
+    payload: TopScorerCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    column = db.get(Column, payload.column_id)
+    if column is None:
+        raise HTTPException(status_code=404, detail="Column not found")
+    if not _active_member(db, current_user.id, list(column.group_ids or [])):
+        raise HTTPException(status_code=403, detail="Tu ingreso al prode está pendiente de aprobación")
+    # Lock the top-scorer pick once the tournament has kicked off.
+    if db.query(Match).filter(Match.status != "scheduled").first() is not None:
+        raise HTTPException(status_code=400, detail="El goleador ya no se puede cambiar: el torneo comenzó")
+
+    pick = (
+        db.query(TopScorerPrediction)
+        .filter(
+            TopScorerPrediction.user_id == current_user.id,
+            TopScorerPrediction.column_id == payload.column_id,
+        )
+        .one_or_none()
+    )
+    if pick is None:
+        pick = TopScorerPrediction(user_id=current_user.id, column_id=payload.column_id)
+        db.add(pick)
+    pick.player_name = payload.player_name.strip()
+    pick.team_name = (payload.team_name or "").strip() or None
+    db.commit()
+
+    col = db.get(Column, payload.column_id)
+    cfg = (col.scoring_config if col else None) or {}
+    return TopScorerOut(
+        column_id=payload.column_id,
+        pick=pick.player_name,
+        team_name=pick.team_name,
+        leader=tournament_top_scorer(db),
+        finished=is_tournament_finished(db),
+        points_value=int(cfg.get("pts_top_scorer", 10)),
+    )
 
 
 @router.get("/match/{match_id}", response_model=list[GroupPredictionEntry])

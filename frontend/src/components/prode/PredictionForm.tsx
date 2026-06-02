@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Minus, Plus, Check } from "lucide-react";
+import { Minus, Plus, Check, ChevronDown } from "lucide-react";
 import type { Match, Prediction, AIResult } from "@/types";
 import { cn, isLockExpired, getToken } from "@/lib/utils";
-import { submitPrediction } from "@/lib/api";
+import { submitPrediction, useSquad, type SquadPlayer } from "@/lib/api";
+
+const MAX_PICKS = 5;
 
 interface Props {
   match: Match;
@@ -86,6 +88,105 @@ function ScoredBox({ label, value }: { label: string; value: number }) {
   );
 }
 
+/** Collapsible multi-select of players from both squads (max 5). */
+function PlayerPicker({
+  title,
+  hint,
+  homeTeam,
+  awayTeam,
+  selected,
+  onToggle,
+  disabled,
+}: {
+  title: string;
+  hint: string;
+  homeTeam: string;
+  awayTeam: string;
+  selected: string[];
+  onToggle: (name: string) => void;
+  disabled: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const { data: home } = useSquad(open ? homeTeam : null);
+  const { data: away } = useSquad(open ? awayTeam : null);
+
+  const Section = ({ label, players }: { label: string; players?: SquadPlayer[] }) => (
+    <div className="mb-2">
+      <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-gray-400">{label}</div>
+      <div className="flex flex-wrap gap-1.5">
+        {(players ?? []).map((p) => {
+          const on = selected.includes(p.name);
+          const atCap = !on && selected.length >= MAX_PICKS;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              disabled={disabled || atCap}
+              onClick={() => onToggle(p.name)}
+              className={cn(
+                "rounded-full border px-2 py-1 text-[11px] transition-colors",
+                on
+                  ? "border-blue-500 bg-blue-50 font-medium text-blue-700"
+                  : "border-gray-200 bg-white text-gray-600 hover:border-gray-300",
+                atCap && "opacity-40",
+              )}
+            >
+              {p.name}
+            </button>
+          );
+        })}
+        {!players && <span className="text-[11px] text-gray-300">Cargando…</span>}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="rounded-lg border border-gray-100 bg-gray-50/60">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between px-3 py-2 text-left"
+      >
+        <span className="text-[12px] font-medium text-gray-700">
+          {title}
+          {selected.length > 0 && (
+            <span className="ml-1.5 rounded-full bg-blue-100 px-1.5 text-[10px] font-semibold text-blue-700">
+              {selected.length}
+            </span>
+          )}
+        </span>
+        <ChevronDown className={cn("h-4 w-4 text-gray-400 transition-transform", open && "rotate-180")} />
+      </button>
+
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-1 px-3 pb-2">
+          {selected.map((n) => (
+            <span
+              key={n}
+              className="inline-flex items-center gap-1 rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-medium text-white"
+            >
+              {n}
+              {!disabled && (
+                <button type="button" onClick={() => onToggle(n)} className="leading-none">
+                  ×
+                </button>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {open && (
+        <div className="max-h-52 overflow-y-auto border-t border-gray-100 px-3 py-2">
+          <p className="mb-2 text-[10px] text-gray-400">{hint}</p>
+          <Section label={homeTeam} players={home?.players} />
+          <Section label={awayTeam} players={away?.players} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PredictionForm({ match, existing, columnId, onSaved }: Props) {
   const token = getToken();
 
@@ -93,12 +194,20 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
   const [away, setAway] = useState(existing?.pred_away_score ?? 0);
   const [yellows, setYellows] = useState(existing?.pred_yellows ?? 0);
   const [reds, setReds] = useState(existing?.pred_reds ?? 0);
+  const [scorers, setScorers] = useState<string[]>(existing?.pred_scorers ?? []);
+  const [cards, setCards] = useState<string[]>(existing?.pred_cards ?? []);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const homeName = shortName(match, "home");
   const awayName = shortName(match, "away");
+  const homeTeamName = match.home_team?.name || homeName;
+  const awayTeamName = match.away_team?.name || awayName;
+
+  const toggle = (list: string[], setList: (v: string[]) => void) => (name: string) => {
+    setList(list.includes(name) ? list.filter((n) => n !== name) : [...list, name].slice(0, MAX_PICKS));
+  };
 
   if ((!token || !columnId) && !existing?.is_scored) {
     return (
@@ -118,6 +227,7 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
 
   // Scored breakdown view
   if (existing?.is_scored) {
+    const myHits = (existing.pred_scorers ?? []).filter((n) => (match.scorers ?? []).includes(n));
     return (
       <div className="rounded-xl border border-gray-200 bg-white p-3.5">
         <div className="mb-3.5 flex items-center justify-between">
@@ -127,12 +237,24 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
           </span>
           <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-500">🔒 Cerrada</span>
         </div>
-        <div className="mb-3.5 grid grid-cols-4 gap-1.5">
+        <div className="mb-3 grid grid-cols-3 gap-1.5">
           <ScoredBox label="Resultado" value={existing.pts_result} />
           <ScoredBox label="Goles" value={existing.pts_goals} />
           <ScoredBox label="Score" value={existing.pts_exact_score} />
           <ScoredBox label="Amarillas" value={existing.pts_yellows_scored} />
+          <ScoredBox label="⚽ Goleadores" value={existing.pts_scorers} />
+          <ScoredBox label="🟨 Tarjetas" value={existing.pts_cards} />
         </div>
+        {(match.scorers ?? []).length > 0 && (
+          <p className="mb-1 text-[11px] text-gray-500">
+            ⚽ Marcaron: <span className="text-gray-700">{(match.scorers ?? []).join(", ")}</span>
+          </p>
+        )}
+        {(existing.pred_scorers ?? []).length > 0 && (
+          <p className="mb-2 text-[11px] text-gray-400">
+            Tus goleadores: {existing.pred_scorers.map((n) => (myHits.includes(n) ? `✅ ${n}` : `❌ ${n}`)).join(" · ")}
+          </p>
+        )}
         <div className="text-center text-[13px] font-semibold text-green-600">
           Total: +{existing.total_points} pts
         </div>
@@ -157,6 +279,8 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
         pred_away_score: away,
         pred_yellows: yellows,
         pred_reds: reds,
+        pred_scorers: scorers,
+        pred_cards: cards,
       });
       setSaved(true);
       onSaved?.();
@@ -217,7 +341,7 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
         </div>
       </div>
 
-      <div className="mb-3.5 flex gap-2">
+      <div className="mb-3 flex gap-2">
         <Stepper label="🟨 Amarillas" value={yellows} onChange={setYellows} disabled={locked} />
         <Stepper label="🟥 Rojas" value={reds} onChange={setReds} disabled={locked} />
         <div className="flex-1 rounded-lg bg-gray-50 p-2 text-center">
@@ -225,6 +349,29 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
           <div className="text-lg font-semibold text-gray-700">{home + away}</div>
         </div>
       </div>
+
+      {!locked && (
+        <div className="mb-3 space-y-2">
+          <PlayerPicker
+            title="⚽ ¿Quién marca? (opcional, +3 c/u)"
+            hint={`Elegí hasta ${MAX_PICKS} jugadores que creas que van a marcar.`}
+            homeTeam={homeTeamName}
+            awayTeam={awayTeamName}
+            selected={scorers}
+            onToggle={toggle(scorers, setScorers)}
+            disabled={locked}
+          />
+          <PlayerPicker
+            title="🟨 ¿Quién ve tarjeta? (opcional, +2 c/u)"
+            hint={`Elegí hasta ${MAX_PICKS} jugadores que creas que van a ser amonestados.`}
+            homeTeam={homeTeamName}
+            awayTeam={awayTeamName}
+            selected={cards}
+            onToggle={toggle(cards, setCards)}
+            disabled={locked}
+          />
+        </div>
+      )}
 
       {ai && <p className="mb-2.5 text-center text-[11px] text-gray-400">{ai}</p>}
       {error && <p className="mb-2.5 text-center text-xs text-red-500">{error}</p>}

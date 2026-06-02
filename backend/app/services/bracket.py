@@ -7,6 +7,8 @@ propagated up the tree. Idempotent — safe to run after every sync.
 """
 from __future__ import annotations
 
+import random
+
 from sqlalchemy.orm import Session
 
 from app.models import Match
@@ -34,7 +36,7 @@ def _standings(db: Session):
         counts[ltr] += 1
         g = table[ltr]
         for team in (m.home_team, m.away_team):
-            g.setdefault(team, {"team": team, "pts": 0, "gd": 0, "gf": 0})
+            g.setdefault(team, {"team": team, "pts": 0, "gd": 0, "gf": 0, "fp": 0})
         if m.status != "finished" or m.home_score is None or m.away_score is None:
             continue
         finished[ltr] += 1
@@ -42,6 +44,9 @@ def _standings(db: Session):
         h, a = g[m.home_team], g[m.away_team]
         h["gf"] += hs; h["gd"] += hs - as_
         a["gf"] += as_; a["gd"] += as_ - hs
+        # FIFA fair-play (approx: yellow -1, red -4); higher = fewer cards
+        h["fp"] -= (m.home_yellows or 0) + 4 * (m.home_reds or 0)
+        a["fp"] -= (m.away_yellows or 0) + 4 * (m.away_reds or 0)
         if hs > as_:
             h["pts"] += 3
         elif hs < as_:
@@ -52,7 +57,9 @@ def _standings(db: Session):
     ranked: dict[str, list[dict]] = {}
     complete: dict[str, bool] = {}
     for ltr in GROUP_LETTERS:
-        rows = sorted(table[ltr].values(), key=lambda r: (r["pts"], r["gd"], r["gf"]), reverse=True)
+        rows = sorted(
+            table[ltr].values(), key=lambda r: (r["pts"], r["gd"], r["gf"], r["fp"]), reverse=True
+        )
         ranked[ltr] = rows
         complete[ltr] = counts[ltr] > 0 and finished[ltr] == counts[ltr]
     return ranked, complete
@@ -110,7 +117,7 @@ def resolve(db: Session) -> int:
         for ltr in GROUP_LETTERS:
             if len(ranked[ltr]) > 2:
                 thirds.append((ltr, ranked[ltr][2]))
-        thirds.sort(key=lambda t: (t[1]["pts"], t[1]["gd"], t[1]["gf"]), reverse=True)
+        thirds.sort(key=lambda t: (t[1]["pts"], t[1]["gd"], t[1]["gf"], t[1]["fp"]), reverse=True)
         qualifying = [ltr for ltr, _ in thirds[:8]]
         slots = []
         for m in knockout:
@@ -175,29 +182,56 @@ _STRENGTH = {
 }
 
 
-def _strength(name: str) -> int:
-    base = _STRENGTH.get(name, 60)
-    return base * 100 + sum(ord(c) for c in name) % 60  # stable jitter, avoids ties
+_SIGMA = 9.0  # randomness: bigger = more upsets
+
+
+def _base(name: str) -> int:
+    return _STRENGTH.get(name, 60)
+
+
+def _score_pair() -> tuple[int, int]:
+    """A decisive scoreline (winner, loser)."""
+    w = random.choices([1, 2, 2, 3, 3, 4], weights=[3, 5, 5, 3, 2, 1])[0]
+    return w, random.randint(0, w - 1)
+
+
+def _play(home: str, away: str, allow_draw: bool) -> tuple[int, int]:
+    """Probabilistic result, biased by strength but with upsets."""
+    rh = _base(home) + random.gauss(0, _SIGMA)
+    ra = _base(away) + random.gauss(0, _SIGMA)
+    if allow_draw and abs(rh - ra) < 4:
+        g = random.choices([0, 1, 1, 2], weights=[2, 4, 3, 1])[0]
+        return g, g
+    w, l = _score_pair()
+    return (w, l) if rh >= ra else (l, w)
+
+
+def _cards() -> tuple[int, int]:
+    """(yellows, reds) for one team in a match."""
+    yellows = random.choices([0, 1, 2, 3, 4, 5], weights=[1, 3, 4, 3, 2, 1])[0]
+    reds = 0
+    if random.random() < 0.08:
+        reds = 2 if random.random() < 0.15 else 1
+    return yellows, reds
+
+
+def _book(m: Match) -> None:
+    m.home_yellows, m.home_reds = _cards()
+    m.away_yellows, m.away_reds = _cards()
 
 
 def simulate(db: Session) -> dict:
-    """Fill plausible results for every match and resolve the whole bracket.
-
-    Deterministic (strength-based) so the bracket fills end-to-end. Knockout
-    matches never tie. Also scores predictions so the leaderboard moves.
+    """Fill plausible results (probabilistic, biased by strength) + cards, and
+    resolve the whole bracket. Knockout matches never tie. Re-run for a new
+    random outcome. Also scores predictions so the leaderboard moves.
     """
     from app.services.sync import recalculate_match_scores
 
     # 1) Group stage
     for m in db.query(Match).filter(Match.phase.ilike("Grupo %")).all():
-        sh, sa = _strength(m.home_team), _strength(m.away_team)
-        if abs(sh - sa) < 30:
-            hs, as_ = 1, 1
-        elif sh > sa:
-            hs, as_ = 2, 0
-        else:
-            hs, as_ = 0, 2
-        m.status, m.home_score, m.away_score = "finished", hs, as_
+        m.home_score, m.away_score = _play(m.home_team, m.away_team, allow_draw=True)
+        _book(m)
+        m.status = "finished"
     db.commit()
     resolve(db)
 
@@ -209,9 +243,9 @@ def simulate(db: Session) -> dict:
             continue
         if "°" in m.away_team or "Ganador" in m.away_team or "Perdedor" in m.away_team:
             continue
-        sh, sa = _strength(m.home_team), _strength(m.away_team)
+        m.home_score, m.away_score = _play(m.home_team, m.away_team, allow_draw=False)
+        _book(m)
         m.status = "finished"
-        m.home_score, m.away_score = (2, 1) if sh >= sa else (1, 2)
         db.commit()
     resolve(db)
 

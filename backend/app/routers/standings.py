@@ -68,6 +68,7 @@ def _derive_from_matches(db: Session) -> list[dict]:
                 "logo_url": None, "flag_emoji": "", "group": group,
                 "played": 0, "wins": 0, "draws": 0, "losses": 0,
                 "goals_for": 0, "goals_against": 0, "goal_difference": 0, "points": 0, "form": "",
+                "yellows": 0, "reds": 0, "fair_play": 0,
             }
         return table[key]
 
@@ -83,6 +84,8 @@ def _derive_from_matches(db: Session) -> list[dict]:
         if m.status != "finished" or m.home_score is None or m.away_score is None:
             continue
         hs, as_ = m.home_score, m.away_score
+        h["yellows"] += m.home_yellows or 0; h["reds"] += m.home_reds or 0
+        a["yellows"] += m.away_yellows or 0; a["reds"] += m.away_reds or 0
         for r, gf, ga in ((h, hs, as_), (a, as_, hs)):
             r["played"] += 1
             r["goals_for"] += gf
@@ -98,13 +101,18 @@ def _derive_from_matches(db: Session) -> list[dict]:
     rows = list(table.values())
     started = any(m.status == "finished" for m in matches)
 
+    # FIFA fair-play points (approx: yellow -1, red -4). Higher = fewer cards.
+    for r in rows:
+        r["fair_play"] = -(r["yellows"] + 4 * r["reds"])
+
     # Rank within each group; mark 1st/2nd as qualified, collect the thirds.
     by_group: dict[str, list[dict]] = {}
     for r in rows:
         by_group.setdefault(r["group"], []).append(r)
 
     thirds: list[dict] = []
-    rank_key = lambda r: (r["points"], r["goal_difference"], r["goals_for"])  # noqa: E731
+    # Tiebreakers: points → goal diff → goals for → fair play.
+    rank_key = lambda r: (r["points"], r["goal_difference"], r["goals_for"], r["fair_play"])  # noqa: E731
     for grp in by_group.values():
         grp.sort(key=rank_key, reverse=True)
         for i, r in enumerate(grp):

@@ -94,12 +94,32 @@ async def lifespan(app: FastAPI):
         await load_full_fixture()
     except Exception:  # noqa: BLE001
         logger.exception("Initial fixture load failed (continuing)")
+    _seed_fixture_if_empty()
     _ensure_group_integrity()
     _bootstrap_admin()
     _load_squads()
     start_scheduler()
     yield
     stop_scheduler()
+
+
+def _seed_fixture_if_empty() -> None:
+    """If no matches exist (fresh DB and the free API can't serve 2026),
+    seed the official Mundial 2026 fixture + bracket. Never wipes existing data."""
+    from app.database import SessionLocal
+    from app.models import Match
+
+    db = SessionLocal()
+    try:
+        if db.query(Match).count() == 0:
+            from app.seed_2026 import seed
+
+            n = seed()
+            logger.info("Seeded %d matches into empty DB", n)
+    except Exception:  # noqa: BLE001
+        logger.exception("Fixture auto-seed failed")
+    finally:
+        db.close()
 
 
 def _load_squads() -> None:

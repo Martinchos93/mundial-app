@@ -54,10 +54,7 @@ export const metadata: Metadata = {
     follow: true,
     googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 },
   },
-  icons: {
-    icon: [{ url: "/favicon.ico" }, { url: "/icon", type: "image/png" }],
-    apple: "/icon",
-  },
+  // Favicon comes from the file-based convention (app/icon.svg) — the World Cup trophy.
   appleWebApp: { capable: true, title: "ProdeGoat", statusBarStyle: "default" },
 };
 

@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     ADMIN_PASSWORD: str = "admin1234"
 
     CORS_ORIGINS: str = "http://localhost:3000"
+    # Regex fallback so the production domain + Vercel preview URLs are allowed
+    # without having to enumerate every deploy URL. Override via env if needed.
+    CORS_ORIGIN_REGEX: str = r"https://([a-z0-9-]+\.)*(prodegoat\.app|vercel\.app)"
 
     # Domain constants
     WORLD_CUP_LEAGUE_ID: int = 1

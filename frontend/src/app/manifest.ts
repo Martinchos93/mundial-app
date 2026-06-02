@@ -12,9 +12,6 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#2563eb",
     lang: "es",
     categories: ["sports", "games"],
-    icons: [
-      { src: "/icon", sizes: "512x512", type: "image/png" },
-      { src: "/icon", sizes: "192x192", type: "image/png" },
-    ],
+    icons: [{ src: "/icon.svg", sizes: "any", type: "image/svg+xml" }],
   };
 }

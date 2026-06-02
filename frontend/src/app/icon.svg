@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 384" fill="none">
+  <!-- green base -->
+  <path d="M78 372 L178 372 L158 330 L98 330 Z" fill="#6FC093"/>
+  <path d="M98 330 L158 330 L154 314 L102 314 Z" fill="#54AB7D"/>
+
+  <!-- trophy body (front, light gold) -->
+  <path d="M104 118 C96 150 88 190 96 240 C100 280 98 300 108 316 L148 316 C158 300 156 280 160 240 C168 190 160 150 152 118 C140 128 116 128 104 118 Z" fill="#F2C84B"/>
+  <!-- left-side shading (darker gold) for depth -->
+  <path d="M104 118 C96 150 88 190 96 240 C100 280 98 300 108 316 L126 316 C120 300 117 280 117 240 C115 190 117 150 121 124 C112 124 108 122 104 118 Z" fill="#D89B25"/>
+
+  <!-- raised arms forming the cup -->
+  <path d="M122 134 C102 126 80 106 68 72 C64 62 57 62 57 74 C59 102 77 126 101 142 C109 146 119 142 122 134 Z" fill="#D89B25"/>
+  <path d="M134 134 C154 126 176 106 188 72 C192 62 199 62 199 74 C197 102 179 126 155 142 C147 146 137 142 134 134 Z" fill="#F2C84B"/>
+
+  <!-- globe / head -->
+  <ellipse cx="128" cy="102" rx="22" ry="26" fill="#F7E4A1"/>
+</svg>

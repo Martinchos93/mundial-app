@@ -130,7 +130,9 @@ export default function TeamsPage() {
               </thead>
               <tbody>
                 {rows.map((t: Team, i) => {
-                  const q = i < 2;
+                  const q = t.qualified ?? i < 2;
+                  const third = t.qualifier === "third";
+                  const qbg = q ? (third ? "bg-sky-50/50" : "bg-green-50/50") : "";
                   return (
                     <tr
                       key={t.id}
@@ -140,22 +142,24 @@ export default function TeamsPage() {
                       <td
                         className={cn(
                           "border-b border-gray-50 py-2.5 pl-2.5 text-left",
-                          q && "border-l-[3px] border-l-green-400 bg-green-50/50",
+                          q && !third && "border-l-[3px] border-l-green-400 bg-green-50/50",
+                          q && third && "border-l-[3px] border-l-sky-400 bg-sky-50/50",
                         )}
                       >
                         <span className="flex items-center gap-1.5">
                           <span className="text-[11px] text-gray-400">{i + 1}</span>
                           <span>{t.flag_emoji || "🏳️"}</span>
                           <span className="font-medium text-gray-800">{t.short_name || t.name}</span>
+                          {third && <span className="rounded-full bg-sky-100 px-1.5 text-[9px] font-semibold text-sky-600">3°</span>}
                         </span>
                       </td>
-                      <td className={cn("border-b border-gray-50 px-1 text-center text-gray-500", q && "bg-green-50/50")}>{t.played ?? 0}</td>
-                      <td className={cn("border-b border-gray-50 px-1 text-center text-gray-500", q && "bg-green-50/50")}>{t.wins ?? 0}</td>
-                      <td className={cn("border-b border-gray-50 px-1 text-center text-gray-500", q && "bg-green-50/50")}>{t.draws ?? 0}</td>
-                      <td className={cn("border-b border-gray-50 px-1 text-center text-gray-500", q && "bg-green-50/50")}>{t.losses ?? 0}</td>
-                      <td className={cn("border-b border-gray-50 px-1 text-center text-gray-500", q && "bg-green-50/50")}>{t.goal_difference ?? 0}</td>
-                      <td className={cn("border-b border-gray-50 px-1 text-center font-bold text-gray-900", q && "bg-green-50/50")}>{t.points ?? 0}</td>
-                      <td className={cn("border-b border-gray-50 px-1", q && "bg-green-50/50")}>
+                      <td className={cn("border-b border-gray-50 px-1 text-center text-gray-500", qbg)}>{t.played ?? 0}</td>
+                      <td className={cn("border-b border-gray-50 px-1 text-center text-gray-500", qbg)}>{t.wins ?? 0}</td>
+                      <td className={cn("border-b border-gray-50 px-1 text-center text-gray-500", qbg)}>{t.draws ?? 0}</td>
+                      <td className={cn("border-b border-gray-50 px-1 text-center text-gray-500", qbg)}>{t.losses ?? 0}</td>
+                      <td className={cn("border-b border-gray-50 px-1 text-center text-gray-500", qbg)}>{t.goal_difference ?? 0}</td>
+                      <td className={cn("border-b border-gray-50 px-1 text-center font-bold text-gray-900", qbg)}>{t.points ?? 0}</td>
+                      <td className={cn("border-b border-gray-50 px-1", qbg)}>
                         <FormPills form={t.form} />
                       </td>
                     </tr>
@@ -173,7 +177,9 @@ export default function TeamsPage() {
           </div>
         )}
 
-        <p className="mt-2 text-center text-[11px] text-gray-400">🟢 Clasifican a octavos de final</p>
+        <p className="mt-2 text-center text-[11px] text-gray-400">
+          🟢 Clasifican 1° y 2° · 🔵 mejores 8 terceros (32 a dieciseisavos)
+        </p>
       </main>
 
       <Navbar />

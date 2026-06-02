@@ -44,6 +44,9 @@ def _transform_api(raw: list[dict]) -> list[dict]:
                     "goal_difference": row.get("goalsDiff"),
                     "points": row.get("points"),
                     "form": row.get("form"),
+                    "rank": row.get("rank"),
+                    "qualified": (row.get("rank") or 99) <= 2,
+                    "qualifier": "group" if (row.get("rank") or 99) <= 2 else None,
                 }
             )
     return out
@@ -93,7 +96,32 @@ def _derive_from_matches(db: Session) -> list[dict]:
             h["draws"] += 1; a["draws"] += 1; h["points"] += 1; a["points"] += 1
 
     rows = list(table.values())
-    rows.sort(key=lambda r: (r["group"], -r["points"], -r["goal_difference"]))
+    started = any(m.status == "finished" for m in matches)
+
+    # Rank within each group; mark 1st/2nd as qualified, collect the thirds.
+    by_group: dict[str, list[dict]] = {}
+    for r in rows:
+        by_group.setdefault(r["group"], []).append(r)
+
+    thirds: list[dict] = []
+    rank_key = lambda r: (r["points"], r["goal_difference"], r["goals_for"])  # noqa: E731
+    for grp in by_group.values():
+        grp.sort(key=rank_key, reverse=True)
+        for i, r in enumerate(grp):
+            r["rank"] = i + 1
+            r["qualified"] = i < 2
+            r["qualifier"] = "group" if i < 2 else None
+            if i == 2:
+                thirds.append(r)
+
+    # 8 best third-placed teams qualify too (only once the tournament started).
+    thirds.sort(key=rank_key, reverse=True)
+    for r in thirds[:8]:
+        if started:
+            r["qualified"] = True
+            r["qualifier"] = "third"
+
+    rows.sort(key=lambda r: (r["group"], -r["points"], -r["goal_difference"], -r["goals_for"]))
     return rows
 
 

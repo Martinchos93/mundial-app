@@ -38,6 +38,9 @@ export interface Team {
   goal_difference?: number;
   points?: number;
   form?: string; // recent results e.g. "WWDLW"
+  rank?: number;
+  qualified?: boolean;
+  qualifier?: "group" | "third" | null;
   // aggregate stats (optional, present on /teams/:id)
   xg_for?: number;
   xg_against?: number;

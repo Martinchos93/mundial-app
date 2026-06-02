@@ -19,6 +19,7 @@ from app.routers import (
     ai,
     admin,
     standings,
+    stats,
     news,
     bracket,
     squads,
@@ -149,7 +150,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for r in (auth, matches, teams, players, predictions, groups, leaderboard, ai, admin, standings):
+for r in (auth, matches, teams, players, predictions, groups, leaderboard, ai, admin, standings, stats):
     app.include_router(r.router)
 app.include_router(news.router)
 app.include_router(news.admin_router)

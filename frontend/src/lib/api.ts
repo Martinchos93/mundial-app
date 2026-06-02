@@ -331,6 +331,41 @@ export function useStandings() {
   );
 }
 
+export interface ScorerStat {
+  name: string;
+  team: string | null;
+  photo_url: string | null;
+  goals: number;
+  yellows: number;
+  reds: number;
+}
+
+export interface TeamStat {
+  team: string;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  gf: number;
+  ga: number;
+  gd: number;
+  yellows: number;
+  reds: number;
+  points: number;
+}
+
+export interface TournamentStats {
+  totals: { goals: number; matches: number; yellows: number; reds: number; avg_goals: number };
+  scorers: ScorerStat[];
+  teams: TeamStat[];
+}
+
+export function useTournamentStats() {
+  return useSWR<TournamentStats>("/stats/tournament", (url: string) =>
+    http.get(url).then((r) => r.data as TournamentStats),
+  );
+}
+
 export function useTeam(id: string | number | null) {
   const { data, error, isLoading } = useSWR(
     id ? `/teams/${id}` : null,

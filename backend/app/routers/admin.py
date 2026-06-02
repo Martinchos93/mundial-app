@@ -57,6 +57,18 @@ def create_admin(payload: AdminCreate, db: Session = Depends(get_db)):
     return UserOut.model_validate(u)
 
 
+@router.post("/users/{user_id}/make-admin", response_model=UserOut)
+def make_admin(user_id: int, db: Session = Depends(get_db)):
+    """Promote an existing registered user to admin."""
+    u = db.get(User, user_id)
+    if u is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    u.is_admin = True
+    db.commit()
+    db.refresh(u)
+    return UserOut.model_validate(u)
+
+
 @router.post("/admins/{user_id}/revoke", response_model=UserOut)
 def revoke_admin(user_id: int, db: Session = Depends(get_db)):
     u = db.get(User, user_id)

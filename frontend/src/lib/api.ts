@@ -683,6 +683,11 @@ export async function revokeAdmin(userId: number): Promise<void> {
   await http.post(`/admin/admins/${userId}/revoke`);
 }
 
+/** Promote an existing registered user to admin. */
+export async function makeAdmin(userId: number): Promise<void> {
+  await http.post(`/admin/users/${userId}/make-admin`);
+}
+
 export interface CreateColumnBody {
   name: string;
   pts_result: number;

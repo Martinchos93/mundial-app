@@ -1,12 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from pydantic import BaseModel, Field, EmailStr
 
 from app.database import get_db
 from app.deps import get_current_admin
-from app.models import Column, Match, Prediction, User, Group, AIPrediction
+from app.models import Column, Match, Prediction, User, Group, AIPrediction, Membership
 from app.models.column import DEFAULT_SCORING_CONFIG
 from app.schemas.column import ColumnCreate, ColumnUpdate, ColumnOut, ColumnStats
 from app.schemas.auth import UserOut
@@ -65,6 +65,47 @@ def revoke_admin(user_id: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(u)
     return UserOut.model_validate(u)
+
+
+@router.get("/users")
+def list_users(
+    q: str = "",
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=50),
+    db: Session = Depends(get_db),
+):
+    """Paginated, searchable list of all accounts (admin only)."""
+    query = db.query(User)
+    if q.strip():
+        like = f"%{q.strip()}%"
+        query = query.filter(
+            or_(
+                User.username.ilike(like),
+                User.email.ilike(like),
+                User.first_name.ilike(like),
+                User.last_name.ilike(like),
+            )
+        )
+    total = query.with_entities(func.count(User.id)).scalar() or 0
+    users = (
+        query.order_by(User.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    # prode counts in one query
+    counts = dict(
+        db.query(Membership.user_id, func.count(Membership.id))
+        .filter(Membership.user_id.in_([u.id for u in users]))
+        .group_by(Membership.user_id)
+        .all()
+    )
+    items = []
+    for u in users:
+        d = UserOut.model_validate(u).model_dump(mode="json")
+        d["prodes"] = int(counts.get(u.id, 0))
+        items.append(d)
+    return {"items": items, "total": int(total), "page": page, "page_size": page_size}
 
 
 def _column_stats(db: Session, col: Column) -> ColumnStats:

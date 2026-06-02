@@ -542,6 +542,33 @@ export function useAdmins() {
   return useSWR<SessionUser[]>("/admin/admins", (url: string) => http.get(url).then((r) => r.data));
 }
 
+export interface AdminUser {
+  id: number;
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  age: number | null;
+  is_admin: boolean;
+  created_at: string;
+  prodes: number;
+}
+
+export interface AdminUsersPage {
+  items: AdminUser[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export function useAdminUsers(q: string, page: number, pageSize = 10) {
+  return useSWR<AdminUsersPage>(
+    `/admin/users?q=${encodeURIComponent(q)}&page=${page}&page_size=${pageSize}`,
+    (url: string) => http.get(url).then((r) => r.data as AdminUsersPage),
+    { keepPreviousData: true },
+  );
+}
+
 export interface CreateAdminBody {
   username: string;
   password: string;

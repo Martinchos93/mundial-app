@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Trash2, Pencil, Eye, EyeOff, Bold, Italic, Heading, List, Link2, Image as ImageIcon } from "lucide-react";
+import { Trash2, Pencil, Eye, EyeOff, Bold, Italic, Heading, List, Link2, Image as ImageIcon, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import Markdown from "@/components/Markdown";
 import {
@@ -16,6 +16,7 @@ import {
   useAdmins,
   createAdmin,
   revokeAdmin,
+  useAdminUsers,
 } from "@/lib/api";
 import { cn, formatFullDate, getToken, getUser } from "@/lib/utils";
 import type { News } from "@/types";
@@ -165,6 +166,78 @@ function TournamentTools() {
   );
 }
 
+function UsersTable() {
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = useAdminUsers(q, page, 10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [q]);
+
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / 10));
+
+  return (
+    <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3.5">
+      <div className="mb-2.5 flex items-center justify-between">
+        <div className="text-[13px] font-medium text-gray-900">Cuentas</div>
+        <span className="text-[11px] text-gray-400">{total} en total</span>
+      </div>
+      <div className="relative mb-3">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Buscar por usuario, nombre o email…"
+          className="w-full rounded-lg border border-gray-200 py-2 pl-8 pr-3 text-[13px] focus:border-blue-400 focus:outline-none"
+        />
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-[12px]">
+          <thead>
+            <tr className="border-b border-gray-100 text-[10px] uppercase tracking-wider text-gray-400">
+              <th className="py-1.5 pr-2 font-medium">Usuario</th>
+              <th className="px-2 font-medium">Email</th>
+              <th className="px-2 text-center font-medium">Prodes</th>
+              <th className="pl-2 text-center font-medium">Rol</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data?.items.map((u) => (
+              <tr key={u.id} className="border-b border-gray-50 last:border-0">
+                <td className="py-2 pr-2">
+                  <div className="font-medium text-gray-900">{u.first_name} {u.last_name}</div>
+                  <div className="text-[11px] text-gray-400">@{u.username}{u.age != null ? ` · ${u.age}` : ""}</div>
+                </td>
+                <td className="max-w-[160px] truncate px-2 text-gray-500">{u.email}</td>
+                <td className="px-2 text-center text-gray-600">{u.prodes}</td>
+                <td className="pl-2 text-center">
+                  {u.is_admin
+                    ? <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">Admin</span>
+                    : <span className="text-[11px] text-gray-300">—</span>}
+                </td>
+              </tr>
+            ))}
+            {!isLoading && data?.items.length === 0 && (
+              <tr><td colSpan={4} className="py-6 text-center text-gray-400">Sin resultados.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {totalPages > 1 && (
+        <div className="mt-3 flex items-center justify-center gap-3">
+          <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="rounded-lg border border-gray-200 p-1.5 text-gray-500 disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button>
+          <span className="text-[12px] text-gray-500">{page} / {totalPages}</span>
+          <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="rounded-lg border border-gray-200 p-1.5 text-gray-500 disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const emptyForm = { title: "", body: "", image_url: "", author: "" };
 
 export default function AdminPage() {
@@ -276,6 +349,7 @@ export default function AdminPage() {
       </header>
 
       <main className="px-4 pb-24 pt-3">
+        <UsersTable />
         <AdminsManager />
         <TournamentTools />
 

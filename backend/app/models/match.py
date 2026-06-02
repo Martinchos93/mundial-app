@@ -45,6 +45,8 @@ class Match(Base):
     # per-match goalscorer/card predictions and the tournament top scorer.
     scorers: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
     booked: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
+    # Subset of `booked` who saw a red card (so yellow vs red can be scored).
+    red_players: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
 
     home_xg: Mapped[float | None] = mapped_column(Float, nullable=True)
     away_xg: Mapped[float | None] = mapped_column(Float, nullable=True)

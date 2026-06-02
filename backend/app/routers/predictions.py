@@ -94,9 +94,12 @@ def upsert_prediction(
     pred.pred_away_score = payload.pred_away_score
     pred.pred_yellows = payload.pred_yellows
     pred.pred_reds = payload.pred_reds
-    # Dedupe + cap player picks (None when empty so the column stays clean).
-    pred.pred_scorers = list(dict.fromkeys(payload.pred_scorers))[:5] or None
-    pred.pred_cards = list(dict.fromkeys(payload.pred_cards))[:5] or None
+    # Per-player picks: keep only rows that carry a goal/card.
+    players = [p for p in payload.pred_players if (p.g or p.y or p.r)]
+    pred.pred_players = [p.model_dump() for p in players] or None
+    # Derive legacy name lists for display / back-compat.
+    pred.pred_scorers = [p.name for p in players if p.g] or None
+    pred.pred_cards = [p.name for p in players if (p.y or p.r)] or None
     db.commit()
     db.refresh(pred)
     return PredictionOut.model_validate(pred)

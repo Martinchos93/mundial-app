@@ -13,6 +13,7 @@ import type {
   MatchEvent,
   News,
   Member,
+  PlayerEvent,
 } from "@/types";
 import { getToken, getSelectedGroupId, saveAuth, type SessionUser } from "@/lib/utils";
 import { flagFor } from "@/lib/flags";
@@ -72,6 +73,7 @@ interface BackendMatch {
   away_reds: number;
   scorers: string[] | null;
   booked: string[] | null;
+  red_players: string[] | null;
 }
 
 function adaptMatch(m: BackendMatch): Match {
@@ -104,6 +106,7 @@ function adaptMatch(m: BackendMatch): Match {
     away_reds: m.away_reds ?? 0,
     scorers: m.scorers ?? [],
     booked: m.booked ?? [],
+    red_players: m.red_players ?? [],
     ai_prediction: null,
     events: [],
   };
@@ -169,6 +172,7 @@ interface BackendPrediction {
   pred_reds: number;
   pred_scorers: string[] | null;
   pred_cards: string[] | null;
+  pred_players: PlayerEvent[] | null;
   locked: boolean;
   score: BackendScore | null;
 }
@@ -186,6 +190,7 @@ function adaptPrediction(p: BackendPrediction): Prediction {
     pred_reds: p.pred_reds,
     pred_scorers: p.pred_scorers ?? [],
     pred_cards: p.pred_cards ?? [],
+    pred_players: p.pred_players ?? [],
     pts_result: s?.pts_result ?? 0,
     pts_goals: s?.pts_exact ?? 0,
     pts_yellows_scored: s?.pts_yellows ?? 0,
@@ -505,8 +510,7 @@ export interface SubmitPredictionBody {
   pred_away_score: number;
   pred_yellows: number;
   pred_reds: number;
-  pred_scorers?: string[];
-  pred_cards?: string[];
+  pred_players?: PlayerEvent[];
 }
 
 export async function submitPrediction(body: SubmitPredictionBody): Promise<Prediction> {
@@ -806,4 +810,21 @@ export async function simulateTournament(): Promise<{ champion?: string }> {
 
 export async function resetTournament(): Promise<void> {
   await http.post(`/admin/bracket/reset`);
+}
+
+// ---- Admin: manual match result -----------------------------------------
+
+export interface MatchResultBody {
+  home_score: number;
+  away_score: number;
+  players: PlayerEvent[];
+  finished: boolean;
+}
+
+export async function setMatchResult(
+  matchId: number,
+  body: MatchResultBody,
+): Promise<{ status: string; score: string; recalculated_predictions: number }> {
+  const res = await http.post(`/admin/matches/${matchId}/result`, body);
+  return res.data;
 }

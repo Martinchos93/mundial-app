@@ -105,6 +105,7 @@ export interface Match {
   away_reds: number;
   scorers?: string[];
   booked?: string[];
+  red_players?: string[];
   ai_prediction?: AIPrediction | null;
   events?: MatchEvent[];
 }
@@ -158,6 +159,14 @@ export interface Column {
   groups?: Group[];
 }
 
+export interface PlayerEvent {
+  name: string;
+  team?: string | null;
+  g: number;
+  y: number;
+  r: number;
+}
+
 export interface Prediction {
   id: number;
   user_id: number;
@@ -170,6 +179,7 @@ export interface Prediction {
   pred_reds: number;
   pred_scorers: string[];
   pred_cards: string[];
+  pred_players: PlayerEvent[];
   pts_result: number;
   pts_goals: number;
   pts_yellows_scored: number;

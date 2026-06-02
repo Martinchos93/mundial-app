@@ -1,6 +1,14 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+class PlayerEvent(BaseModel):
+    name: str = Field(..., min_length=1, max_length=120)
+    team: str | None = None
+    g: int = Field(default=0, ge=0, le=9)  # goals
+    y: int = Field(default=0, ge=0, le=1)  # yellow card
+    r: int = Field(default=0, ge=0, le=1)  # red card
 
 
 class PredictionCreate(BaseModel):
@@ -10,9 +18,8 @@ class PredictionCreate(BaseModel):
     pred_away_score: int = Field(..., ge=0, le=30)
     pred_yellows: int = Field(default=0, ge=0, le=50)
     pred_reds: int = Field(default=0, ge=0, le=20)
-    # Optional player picks (names). Capped to keep the prode fair.
-    pred_scorers: list[str] = Field(default_factory=list, max_length=5)
-    pred_cards: list[str] = Field(default_factory=list, max_length=5)
+    # Per-player picks with counts (goals / yellow / red). Capped server-side.
+    pred_players: list[PlayerEvent] = Field(default_factory=list, max_length=40)
 
 
 class ScoreOut(BaseModel):
@@ -39,11 +46,17 @@ class PredictionOut(BaseModel):
     pred_reds: int
     pred_scorers: list[str] = Field(default_factory=list)
     pred_cards: list[str] = Field(default_factory=list)
+    pred_players: list[PlayerEvent] = Field(default_factory=list)
     submitted_at: datetime
     locked: bool
     score: ScoreOut | None = None
 
     model_config = {"from_attributes": True}
+
+    @field_validator("pred_scorers", "pred_cards", "pred_players", mode="before")
+    @classmethod
+    def _none_to_list(cls, v):
+        return v or []
 
 
 class GroupPredictionEntry(BaseModel):

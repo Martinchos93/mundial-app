@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import String, DateTime, Integer, Boolean, ForeignKey, UniqueConstraint, func
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -24,8 +24,11 @@ class Prediction(Base):
     pred_reds: Mapped[int] = mapped_column(Integer, default=0)
 
     # Optional player-level predictions (names). Empty/None = no pick, no points.
+    # pred_scorers/pred_cards are kept (derived) for display/back-compat; the
+    # source of truth is pred_players: [{name, team, g, y, r}] with counts.
     pred_scorers: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
     pred_cards: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
+    pred_players: Mapped[list[dict] | None] = mapped_column(JSONB, nullable=True)
 
     submitted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

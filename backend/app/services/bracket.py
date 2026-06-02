@@ -258,10 +258,17 @@ def _book(db: Session, m: Match) -> None:
     scorers += _weighted_names(away_sq, _SCORE_W, m.away_score or 0, distinct=False)
     m.scorers = scorers
 
-    # Booked: distinct players, one per card (yellow or red).
-    booked = _weighted_names(home_sq, _CARD_W, (m.home_yellows or 0) + (m.home_reds or 0), distinct=True)
-    booked += _weighted_names(away_sq, _CARD_W, (m.away_yellows or 0) + (m.away_reds or 0), distinct=True)
-    m.booked = booked
+    # Booked: distinct players, one per card. The last `reds` of each team's
+    # list are designated red cards so yellow vs red can be scored.
+    home_booked = _weighted_names(home_sq, _CARD_W, (m.home_yellows or 0) + (m.home_reds or 0), distinct=True)
+    away_booked = _weighted_names(away_sq, _CARD_W, (m.away_yellows or 0) + (m.away_reds or 0), distinct=True)
+    m.booked = home_booked + away_booked
+    reds: list[str] = []
+    if m.home_reds:
+        reds += home_booked[len(home_booked) - m.home_reds:]
+    if m.away_reds:
+        reds += away_booked[len(away_booked) - m.away_reds:]
+    m.red_players = reds
 
 
 def tournament_top_scorer(db: Session) -> dict | None:

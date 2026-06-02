@@ -120,8 +120,59 @@ def test_default_config_values():
         "pts_bonus": 3,
         "pts_scorer": 3,
         "pts_card": 2,
+        "pts_card_red": 4,
         "pts_top_scorer": 10,
     }
+
+
+def test_pred_players_goals_count_based():
+    # Predict Mbappe 2 goals; he scores 2 -> +6. Wrong result anyway.
+    b = score(
+        pred_home=1, pred_away=0, actual_home=0, actual_away=2,
+        pred_players=[{"name": "Mbappe", "g": 2}],
+        actual_scorers=["Mbappe", "Mbappe"],
+    )
+    assert b.pts_scorers == 6
+    assert b.total == 6
+
+
+def test_pred_players_goals_capped_by_actual():
+    # Predict 2 but he only scored 1 -> min -> +3.
+    b = score(
+        pred_players=[{"name": "Mbappe", "g": 2}],
+        actual_scorers=["Mbappe"],
+    )
+    assert b.pts_scorers == 3
+
+
+def test_pred_players_yellow_and_red():
+    b = score(
+        pred_players=[
+            {"name": "Messi", "y": 1},   # got yellow -> +2
+            {"name": "Otamendi", "r": 1},  # got red -> +4
+            {"name": "Ghost", "y": 1},   # not booked -> 0
+        ],
+        actual_booked=["Messi", "Otamendi"],
+        actual_reds_players=["Otamendi"],
+    )
+    assert b.pts_cards == 6
+
+
+def test_pred_players_red_pick_needs_red_not_yellow():
+    # Predicted a red but the player only got a yellow -> no points.
+    b = score(
+        pred_players=[{"name": "Messi", "r": 1}],
+        actual_booked=["Messi"],
+        actual_reds_players=[],
+    )
+    assert b.pts_cards == 0
+
+
+def test_pred_players_goal_picks_capped_at_five():
+    picks = [{"name": n, "g": 1} for n in ["a", "b", "c", "d", "e", "f"]]
+    actual = ["a", "b", "c", "d", "e", "f"]  # 6 actually scored
+    b = score(pred_players=picks, actual_scorers=actual)
+    assert b.pts_scorers == 5 * 3  # only first 5 picks count
 
 
 def test_scorers_per_hit():

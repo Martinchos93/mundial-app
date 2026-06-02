@@ -17,9 +17,12 @@ import {
   createAdmin,
   revokeAdmin,
   useAdminUsers,
+  useMatches,
+  setMatchResult,
 } from "@/lib/api";
+import PlayerEventsTable, { type EventMap } from "@/components/prode/PlayerEventsTable";
 import { cn, formatFullDate, getToken, getUser } from "@/lib/utils";
-import type { News } from "@/types";
+import type { News, Match } from "@/types";
 
 function AdminGate() {
   return (
@@ -238,6 +241,151 @@ function UsersTable() {
   );
 }
 
+function matchToEvents(m: Match): EventMap {
+  const ev: EventMap = {};
+  const get = (n: string) => ev[n] ?? { name: n, team: null, g: 0, y: 0, r: 0 };
+  for (const n of m.scorers ?? []) ev[n] = { ...get(n), g: get(n).g + 1 };
+  const reds = new Set(m.red_players ?? []);
+  for (const n of m.booked ?? []) ev[n] = { ...get(n), [reds.has(n) ? "r" : "y"]: 1 };
+  return ev;
+}
+
+function ResultsManager() {
+  const { data: matches } = useMatches();
+  const [q, setQ] = useState("");
+  const [selId, setSelId] = useState<number | null>(null);
+  const [home, setHome] = useState(0);
+  const [away, setAway] = useState(0);
+  const [events, setEvents] = useState<EventMap>({});
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const sel = matches?.find((m) => m.id === selId) ?? null;
+
+  function select(m: Match) {
+    setSelId(m.id);
+    setHome(m.home_score ?? 0);
+    setAway(m.away_score ?? 0);
+    setEvents(matchToEvents(m));
+    setMsg(null);
+  }
+
+  async function save() {
+    if (!sel) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const players = Object.values(events).filter((e) => e.g || e.y || e.r);
+      const res = await setMatchResult(sel.id, { home_score: home, away_score: away, players, finished: true });
+      setMsg(`✅ ${res.score} guardado · ${res.recalculated_predictions} predicciones recalculadas`);
+    } catch {
+      setMsg("No se pudo guardar.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const filtered = (matches ?? [])
+    .filter((m) => {
+      if (!q.trim()) return true;
+      const t = `${m.home_team?.name ?? ""} ${m.away_team?.name ?? ""}`.toLowerCase();
+      return t.includes(q.toLowerCase());
+    })
+    .slice(0, 40);
+
+  const nm = (m: Match, side: "home" | "away") =>
+    (side === "home" ? m.home_team : m.away_team)?.short_name ||
+    (side === "home" ? m.home_team : m.away_team)?.name ||
+    side;
+
+  return (
+    <div className="mb-2.5 rounded-xl border border-gray-200 bg-white p-3.5">
+      <div className="mb-1 text-[13px] font-medium text-gray-900">📝 Cargar / editar resultados</div>
+      <p className="mb-2.5 text-[11px] text-gray-400">
+        Cargá el marcador y (opcional) goleadores y tarjetas por jugador. Al guardar se recalculan los puntos de todos los prodes.
+      </p>
+
+      {!sel ? (
+        <>
+          <div className="mb-2 flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-2">
+            <Search className="h-3.5 w-3.5 text-gray-400" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Buscar partido por selección…"
+              className="w-full bg-transparent py-2 text-[13px] focus:outline-none"
+            />
+          </div>
+          <div className="max-h-64 divide-y divide-gray-50 overflow-y-auto rounded-lg border border-gray-100">
+            {filtered.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => select(m)}
+                className="flex w-full items-center justify-between px-2.5 py-2 text-left hover:bg-gray-50"
+              >
+                <span className="text-[12px] text-gray-800">
+                  {nm(m, "home")} <span className="text-gray-400">vs</span> {nm(m, "away")}
+                </span>
+                <span className="text-[10px] text-gray-400">
+                  {m.status === "finished" ? `${m.home_score}-${m.away_score} ✓` : m.phase}
+                </span>
+              </button>
+            ))}
+            {filtered.length === 0 && <p className="px-2.5 py-3 text-[12px] text-gray-400">Sin partidos.</p>}
+          </div>
+        </>
+      ) : (
+        <>
+          <button onClick={() => setSelId(null)} className="mb-2 text-[12px] text-blue-600">
+            ← Elegir otro partido
+          </button>
+          <div className="mb-3 flex items-center justify-center gap-3">
+            <div className="text-center">
+              <div className="mb-1 text-[11px] text-gray-400">{nm(sel, "home")}</div>
+              <input
+                type="number"
+                min={0}
+                value={home}
+                onChange={(e) => setHome(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                className="h-12 w-12 rounded-xl border border-gray-200 bg-gray-50 text-center text-xl font-semibold focus:border-blue-400 focus:outline-none"
+              />
+            </div>
+            <span className="pt-5 text-gray-300">-</span>
+            <div className="text-center">
+              <div className="mb-1 text-[11px] text-gray-400">{nm(sel, "away")}</div>
+              <input
+                type="number"
+                min={0}
+                value={away}
+                onChange={(e) => setAway(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                className="h-12 w-12 rounded-xl border border-gray-200 bg-gray-50 text-center text-xl font-semibold focus:border-blue-400 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <p className="mb-1.5 text-[10px] text-gray-400">Goleadores y tarjetas (opcional, para puntuar picks por jugador):</p>
+          <PlayerEventsTable
+            homeTeam={sel.home_team?.name || nm(sel, "home")}
+            awayTeam={sel.away_team?.name || nm(sel, "away")}
+            value={events}
+            onChange={setEvents}
+            maxGoals={9}
+          />
+
+          {msg && <p className="mt-2 text-center text-[12px] text-gray-600">{msg}</p>}
+          <button
+            onClick={save}
+            disabled={busy}
+            className="mt-2.5 w-full rounded-[10px] bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+          >
+            {busy ? "Guardando…" : "Guardar y contabilizar puntos"}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 const emptyForm = { title: "", body: "", image_url: "", author: "" };
 
 export default function AdminPage() {
@@ -349,6 +497,7 @@ export default function AdminPage() {
       </header>
 
       <main className="px-4 pb-24 pt-3">
+        <ResultsManager />
         <UsersTable />
         <AdminsManager />
         <TournamentTools />

@@ -24,11 +24,12 @@ DEFAULT_CONFIG: dict[str, int] = {
     "pts_bonus": 3,
     "pts_scorer": 3,
     "pts_card": 2,
+    "pts_card_red": 4,
     "pts_top_scorer": 10,
 }
 
 # Anti-gaming cap: a user can pick at most this many players per category per
-# match (otherwise picking the whole squad would guarantee every hit).
+# match (otherwise filling the whole squad would guarantee every hit).
 MAX_PICKS = 5
 
 
@@ -65,6 +66,55 @@ def _count_hits(picks, actuals) -> int:
     return hits
 
 
+def _counter(names) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for n in names or []:
+        k = _norm(n)
+        if k:
+            out[k] = out.get(k, 0) + 1
+    return out
+
+
+def _score_players(
+    pred_players: list[dict],
+    actual_scorers,
+    actual_booked,
+    actual_reds,
+    cfg: dict,
+) -> tuple[int, int]:
+    """Count-based scoring for per-player picks. Returns (goal_pts, card_pts).
+
+    Goals: +pts_scorer per correctly predicted goal, min(pred, actual) per player.
+    Cards: yellow pick that landed +pts_card; red pick that landed +pts_card_red.
+    Only the first MAX_PICKS players (per category) count, to limit gaming.
+    """
+    goals_actual = _counter(actual_scorers)
+    red_set = {_norm(n) for n in (actual_reds or [])}
+    yellow_set = {_norm(n) for n in (actual_booked or [])} - red_set
+
+    goal_pts = card_pts = 0
+    goal_used = card_used = 0
+    for p in pred_players or []:
+        name = _norm(p.get("name", ""))
+        if not name:
+            continue
+        g = int(p.get("g", 0) or 0)
+        y = int(p.get("y", 0) or 0)
+        r = int(p.get("r", 0) or 0)
+
+        if g > 0 and goal_used < MAX_PICKS:
+            goal_used += 1
+            goal_pts += min(g, goals_actual.get(name, 0)) * int(cfg["pts_scorer"])
+
+        if (y > 0 or r > 0) and card_used < MAX_PICKS:
+            card_used += 1
+            if r > 0 and name in red_set:
+                card_pts += int(cfg["pts_card_red"])
+            elif y > 0 and name in yellow_set:
+                card_pts += int(cfg["pts_card"])
+    return goal_pts, card_pts
+
+
 def _outcome(home: int, away: int) -> str:
     if home > away:
         return "home"
@@ -85,8 +135,10 @@ def calculate_score(
     actual_reds: int,
     pred_scorers: list[str] | None = None,
     pred_cards: list[str] | None = None,
+    pred_players: list[dict] | None = None,
     actual_scorers: list[str] | None = None,
     actual_booked: list[str] | None = None,
+    actual_reds_players: list[str] | None = None,
     config: dict[str, Any] | None = None,
 ) -> ScoreBreakdown:
     """Compute the score breakdown for a single prediction vs a final result."""
@@ -107,9 +159,15 @@ def calculate_score(
     if result_correct and goals_exact:
         breakdown.pts_bonus = int(cfg["pts_bonus"])
 
-    # Optional per-match player picks: points per correct hit (capped picks).
-    breakdown.pts_scorers = _count_hits(pred_scorers, actual_scorers) * int(cfg["pts_scorer"])
-    breakdown.pts_cards = _count_hits(pred_cards, actual_booked) * int(cfg["pts_card"])
+    # Per-player picks. Prefer the count-based pred_players; fall back to the
+    # legacy name-list membership for older predictions.
+    if pred_players:
+        breakdown.pts_scorers, breakdown.pts_cards = _score_players(
+            pred_players, actual_scorers, actual_booked, actual_reds_players, cfg
+        )
+    else:
+        breakdown.pts_scorers = _count_hits(pred_scorers, actual_scorers) * int(cfg["pts_scorer"])
+        breakdown.pts_cards = _count_hits(pred_cards, actual_booked) * int(cfg["pts_card"])
 
     breakdown.total = (
         breakdown.pts_result
@@ -136,7 +194,9 @@ def score_prediction(prediction, match, config: dict | None = None) -> ScoreBrea
         actual_reds=(match.home_reds or 0) + (match.away_reds or 0),
         pred_scorers=prediction.pred_scorers,
         pred_cards=prediction.pred_cards,
+        pred_players=prediction.pred_players,
         actual_scorers=match.scorers,
         actual_booked=match.booked,
+        actual_reds_players=match.red_players,
         config=config,
     )

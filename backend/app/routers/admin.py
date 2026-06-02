@@ -10,8 +10,9 @@ from app.models import Column, Match, Prediction, User, Group, AIPrediction, Mem
 from app.models.column import DEFAULT_SCORING_CONFIG
 from app.schemas.column import ColumnCreate, ColumnUpdate, ColumnOut, ColumnStats
 from app.schemas.auth import UserOut
+from app.schemas.prediction import PlayerEvent
 from app.security import hash_password
-from app.services.sync import recalculate_column
+from app.services.sync import recalculate_column, recalculate_match_scores
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(get_current_admin)])
 
@@ -187,6 +188,87 @@ def recalculate(column_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Column not found")
     count = recalculate_column(db, col)
     return {"column_id": column_id, "recalculated_predictions": count}
+
+
+class MatchResultIn(BaseModel):
+    home_score: int = Field(..., ge=0, le=30)
+    away_score: int = Field(..., ge=0, le=30)
+    # Per-player events (goals/yellow/red), same shape as the prediction table.
+    players: list[PlayerEvent] = Field(default_factory=list, max_length=60)
+    finished: bool = True
+
+
+@router.post("/matches/{match_id}/result")
+def set_match_result(match_id: int, payload: MatchResultIn, db: Session = Depends(get_db)):
+    """Manually load (or edit) a match result + player events, then re-tally
+    every prode prediction on that match. Idempotent — safe to re-run to fix
+    errors. Setting finished=false leaves the match open (just stores data)."""
+    m = db.get(Match, match_id)
+    if m is None:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    m.home_score = payload.home_score
+    m.away_score = payload.away_score
+
+    from app.models import Player
+
+    def _is_home(ev) -> bool:
+        if ev.team == m.home_team:
+            return True
+        if ev.team == m.away_team:
+            return False
+        # team not provided (e.g. editing) → resolve from the squad table.
+        pl = db.query(Player).filter(Player.name == ev.name).first()
+        return bool(pl and pl.team_name == m.home_team)
+
+    scorers: list[str] = []
+    booked: list[str] = []
+    reds: list[str] = []
+    hy = hr = ay = ar = 0
+    for p in payload.players:
+        scorers += [p.name] * int(p.g or 0)
+        is_home = _is_home(p)
+        if p.y:
+            if is_home:
+                hy += 1
+            else:
+                ay += 1
+        if p.r:
+            if is_home:
+                hr += 1
+            else:
+                ar += 1
+        if p.y or p.r:
+            booked.append(p.name)
+        if p.r:
+            reds.append(p.name)
+
+    m.scorers = scorers or None
+    m.booked = booked or None
+    m.red_players = reds or None
+    m.home_yellows, m.home_reds = hy, hr
+    m.away_yellows, m.away_reds = ay, ar
+    if payload.finished:
+        m.status = "finished"
+    db.flush()
+
+    recalculated = recalculate_match_scores(db, m) if m.status == "finished" else 0
+    db.commit()
+
+    # Propagate into the knockout bracket (best-effort).
+    try:
+        from app.services.bracket import resolve
+
+        resolve(db)
+    except Exception:  # noqa: BLE001
+        pass
+
+    return {
+        "match_id": m.id,
+        "status": m.status,
+        "score": f"{m.home_score}-{m.away_score}",
+        "recalculated_predictions": recalculated,
+    }
 
 
 @router.get("/stats")

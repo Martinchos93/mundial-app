@@ -772,6 +772,20 @@ export function useNews(page = 1, pageSize = 10) {
   );
 }
 
+export function useNewsItem(id: string | number | null) {
+  return useSWR<News>(id ? `/news/${id}` : null, (url: string) =>
+    http.get(url).then((r) => r.data as News),
+  );
+}
+
+/** Upload an image (admin) → returns its absolute URL on the API host. */
+export async function uploadMedia(file: File): Promise<string> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await http.post(`/admin/media`, fd);
+  return `${baseURL}${res.data.path}`;
+}
+
 export interface SquadPlayer {
   id: number;
   name: string;

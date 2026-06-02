@@ -20,6 +20,7 @@ import {
   useAdminUsers,
   useMatches,
   setMatchResult,
+  uploadMedia,
 } from "@/lib/api";
 import PlayerEventsTable, { type EventMap } from "@/components/prode/PlayerEventsTable";
 import { cn, formatFullDate, getToken, getUser } from "@/lib/utils";
@@ -423,7 +424,28 @@ export default function AdminPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
+  const [uploading, setUploading] = useState<"cover" | "body" | null>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const bodyInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleUpload(file: File | undefined, target: "cover" | "body") {
+    if (!file) return;
+    setUploading(target);
+    setError(null);
+    try {
+      const url = await uploadMedia(file);
+      if (target === "cover") {
+        setForm((f) => ({ ...f, image_url: url }));
+      } else {
+        setForm((f) => ({ ...f, body: `${f.body}\n\n![imagen](${url})\n` }));
+      }
+    } catch {
+      setError("No se pudo subir la imagen (máx 8 MB, formato JPG/PNG/WEBP/GIF).");
+    } finally {
+      setUploading(null);
+    }
+  }
 
   function wrap(before: string, after = before, placeholder = "texto") {
     const ta = bodyRef.current;
@@ -441,18 +463,13 @@ export default function AdminPage() {
     });
   }
 
-  function insertImage() {
-    const url = window.prompt("URL de la imagen:");
-    if (url) setForm((f) => ({ ...f, body: f.body + `\n\n![imagen](${url})\n` }));
-  }
-
   const TOOLBAR = [
     { icon: Bold, fn: () => wrap("**"), label: "Negrita" },
     { icon: Italic, fn: () => wrap("*"), label: "Cursiva" },
     { icon: Heading, fn: () => wrap("## ", "", "Título"), label: "Título" },
     { icon: List, fn: () => wrap("- ", "", "ítem"), label: "Lista" },
     { icon: Link2, fn: () => wrap("[", "](https://)", "texto"), label: "Link" },
-    { icon: ImageIcon, fn: insertImage, label: "Imagen" },
+    { icon: ImageIcon, fn: () => bodyInputRef.current?.click(), label: "Subir imagen al cuerpo" },
   ];
 
   function openCreate() {
@@ -577,11 +594,64 @@ export default function AdminPage() {
                 onChange={(e) => setForm({ ...form, body: e.target.value })}
               />
             )}
+            {/* Cover image: upload to Postgres or paste a URL */}
+            <div className="mb-2.5 rounded-lg border border-gray-200 p-2.5">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[12px] font-medium text-gray-700">Imagen de portada</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => coverInputRef.current?.click()}
+                    disabled={uploading === "cover"}
+                    className="flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1 text-[12px] font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                  >
+                    <ImageIcon className="h-3.5 w-3.5" />
+                    {uploading === "cover" ? "Subiendo…" : "Subir"}
+                  </button>
+                  {form.image_url && (
+                    <button
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, image_url: "" }))}
+                      className="text-[12px] text-gray-400 hover:text-red-500"
+                    >
+                      Quitar
+                    </button>
+                  )}
+                </div>
+              </div>
+              {form.image_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={form.image_url} alt="" className="h-32 w-full rounded-lg object-cover" />
+              ) : (
+                <p className="text-[11px] text-gray-400">Subí un archivo (máx 8 MB) o pegá una URL abajo.</p>
+              )}
+              <input
+                className="mt-2 w-full rounded-lg border border-gray-200 px-2.5 py-2 text-[12px] focus:border-blue-400 focus:outline-none"
+                placeholder="…o pegá una URL de imagen"
+                value={form.image_url}
+                onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+              />
+            </div>
+
             <input
-              className="mb-2.5 w-full rounded-lg border border-gray-200 px-2.5 py-2 text-[13px] focus:border-blue-400 focus:outline-none"
-              placeholder="URL de imagen (opcional)"
-              value={form.image_url}
-              onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+              ref={coverInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                handleUpload(e.target.files?.[0], "cover");
+                e.target.value = "";
+              }}
+            />
+            <input
+              ref={bodyInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                handleUpload(e.target.files?.[0], "body");
+                e.target.value = "";
+              }}
             />
             <input
               className="mb-3 w-full rounded-lg border border-gray-200 px-2.5 py-2 text-[13px] focus:border-blue-400 focus:outline-none"

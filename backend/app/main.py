@@ -23,6 +23,7 @@ from app.routers import (
     news,
     bracket,
     squads,
+    media,
 )
 from app.tasks.scheduler import start_scheduler, stop_scheduler
 
@@ -156,6 +157,8 @@ app.include_router(news.router)
 app.include_router(news.admin_router)
 app.include_router(bracket.router)
 app.include_router(squads.router)
+app.include_router(media.router)
+app.include_router(media.admin_router)
 
 
 @app.get("/health", tags=["meta"])

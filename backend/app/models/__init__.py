@@ -9,6 +9,7 @@ from app.models.ai_prediction import AIPrediction
 from app.models.news import News
 from app.models.player import Player
 from app.models.top_scorer_prediction import TopScorerPrediction
+from app.models.media import Media
 
 __all__ = [
     "Group",
@@ -22,4 +23,5 @@ __all__ = [
     "News",
     "Player",
     "TopScorerPrediction",
+    "Media",
 ]

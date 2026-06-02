@@ -1,13 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
-import Markdown from "@/components/Markdown";
 import { useNews } from "@/lib/api";
 import { formatFullDate } from "@/lib/utils";
 
 const PAGE_SIZE = 10;
+
+/** Strip markdown to a plain-text excerpt. */
+function excerpt(body: string, max = 150): string {
+  const text = body
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "") // images
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1") // links → text
+    .replace(/[#*_>`~-]/g, "") // md symbols
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
 
 export default function NewsPage() {
   const [page, setPage] = useState(1);
@@ -28,8 +39,8 @@ export default function NewsPage() {
       <main className="px-4 pb-24 pt-3">
         {isLoading && (
           <div className="space-y-3">
-            <div className="h-40 animate-pulse rounded-xl border border-gray-200 bg-white" />
-            <div className="h-40 animate-pulse rounded-xl border border-gray-200 bg-white" />
+            <div className="h-28 animate-pulse rounded-xl border border-gray-200 bg-white" />
+            <div className="h-28 animate-pulse rounded-xl border border-gray-200 bg-white" />
           </div>
         )}
 
@@ -48,22 +59,33 @@ export default function NewsPage() {
 
         <div className="space-y-3">
           {data?.items.map((n) => (
-            <article key={n.id} className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-              {n.image_url && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={n.image_url} alt="" className="h-44 w-full object-cover" />
-              )}
-              <div className="p-4">
-                <h2 className="text-base font-semibold text-gray-900">{n.title}</h2>
-                <p className="mt-1 text-[11px] text-gray-400">
-                  {n.author ? `${n.author} · ` : ""}
-                  {formatFullDate(n.created_at)}
-                </p>
-                <div className="mt-2">
-                  <Markdown>{n.body}</Markdown>
+            <Link key={n.id} href={`/news/${n.id}`} className="block">
+              <article className="flex gap-3 rounded-xl border border-gray-200 bg-white p-3 transition-colors hover:border-gray-300">
+                <div className="min-w-0 flex-1">
+                  <h2 className="line-clamp-2 text-[15px] font-semibold leading-snug text-gray-900">
+                    {n.title}
+                  </h2>
+                  <p className="mt-1 text-[11px] text-gray-400">
+                    {n.author ? `${n.author} · ` : ""}
+                    {formatFullDate(n.created_at)}
+                  </p>
+                  <p className="mt-1.5 line-clamp-2 text-[12px] leading-relaxed text-gray-500">
+                    {excerpt(n.body)}
+                  </p>
+                  <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-blue-600">
+                    Leer nota <ArrowRight className="h-3 w-3" />
+                  </span>
                 </div>
-              </div>
-            </article>
+                {n.image_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={n.image_url}
+                    alt=""
+                    className="h-[88px] w-[88px] flex-none rounded-lg object-cover"
+                  />
+                )}
+              </article>
+            </Link>
           ))}
         </div>
 

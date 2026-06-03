@@ -24,6 +24,9 @@ import {
   uploadMedia,
   useSettings,
   setSetting,
+  useContactMessages,
+  toggleContactHandled,
+  deleteContact,
 } from "@/lib/api";
 import PlayerEventsTable, { type EventMap } from "@/components/prode/PlayerEventsTable";
 import { cn, formatFullDate, getToken, getUser } from "@/lib/utils";
@@ -268,6 +271,70 @@ function UsersTable() {
           <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="rounded-lg border border-gray-200 p-1.5 text-gray-500 disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button>
         </div>
       )}
+    </div>
+  );
+}
+
+function ContactManager() {
+  const { data, mutate } = useContactMessages();
+  const messages = data ?? [];
+  const pending = messages.filter((m) => !m.handled).length;
+
+  async function toggle(id: number) {
+    await toggleContactHandled(id);
+    mutate();
+  }
+  async function remove(id: number) {
+    if (!window.confirm("¿Borrar este mensaje?")) return;
+    await deleteContact(id);
+    mutate();
+  }
+
+  return (
+    <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3.5">
+      <div className="mb-2.5 flex items-center justify-between">
+        <div className="text-[13px] font-medium text-gray-900">✉️ Mensajes de contacto</div>
+        <span className="text-[11px] text-gray-400">
+          {messages.length} en total{pending > 0 ? ` · ${pending} sin leer` : ""}
+        </span>
+      </div>
+      {messages.length === 0 && <p className="py-4 text-center text-[12px] text-gray-400">Todavía no hay mensajes.</p>}
+      <div className="space-y-2">
+        {messages.map((m) => (
+          <div
+            key={m.id}
+            className={cn(
+              "rounded-lg border p-3",
+              m.handled ? "border-gray-100 bg-gray-50/60" : "border-blue-100 bg-blue-50/40",
+            )}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="text-[13px] font-semibold text-gray-900">{m.name}</div>
+                <a href={`mailto:${m.email}`} className="text-[11px] text-blue-600 hover:underline">
+                  {m.email}
+                </a>
+              </div>
+              <span className="flex-none text-[10px] text-gray-400">{formatFullDate(m.created_at)}</span>
+            </div>
+            <p className="mt-1.5 whitespace-pre-wrap text-[12.5px] text-gray-700">{m.message}</p>
+            <div className="mt-2 flex items-center gap-2">
+              <a
+                href={`mailto:${m.email}?subject=Re: tu mensaje en ProdeGoat`}
+                className="rounded-lg bg-blue-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-blue-700"
+              >
+                Responder
+              </a>
+              <button onClick={() => toggle(m.id)} className="rounded-lg border border-gray-200 px-2.5 py-1 text-[11px] text-gray-600 hover:bg-gray-50">
+                {m.handled ? "Marcar sin leer" : "Marcar leído"}
+              </button>
+              <button onClick={() => remove(m.id)} className="ml-auto text-[11px] text-gray-400 hover:text-red-500">
+                Borrar
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -622,6 +689,7 @@ export default function AdminPage() {
       </header>
 
       <main className="px-4 pb-24 pt-3">
+        <ContactManager />
         <SettingsManager />
         <ResultsManager />
         <UsersTable />

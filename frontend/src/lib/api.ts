@@ -624,6 +624,35 @@ export async function setSetting(key: string, value: unknown): Promise<AppSettin
   return res.data as AppSettings;
 }
 
+// ---- Contact -----------------------------------------------------------
+
+export interface ContactMessage {
+  id: number;
+  name: string;
+  email: string;
+  message: string;
+  handled: boolean;
+  created_at: string;
+}
+
+export async function sendContact(body: { name: string; email: string; message: string }): Promise<void> {
+  await http.post(`/contact`, body);
+}
+
+export function useContactMessages() {
+  return useSWR<ContactMessage[]>("/admin/contact", (url: string) =>
+    http.get(url).then((r) => r.data as ContactMessage[]),
+  );
+}
+
+export async function toggleContactHandled(id: number): Promise<void> {
+  await http.post(`/admin/contact/${id}/handled`);
+}
+
+export async function deleteContact(id: number): Promise<void> {
+  await http.delete(`/admin/contact/${id}`);
+}
+
 export interface PlayerSearchResult {
   id: number;
   name: string;

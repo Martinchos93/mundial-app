@@ -12,6 +12,7 @@ from app.models.top_scorer_prediction import TopScorerPrediction
 from app.models.champion_prediction import ChampionPrediction
 from app.models.media import Media
 from app.models.setting import Setting
+from app.models.contact import ContactMessage
 
 __all__ = [
     "Group",
@@ -28,4 +29,5 @@ __all__ = [
     "ChampionPrediction",
     "Media",
     "Setting",
+    "ContactMessage",
 ]

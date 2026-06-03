@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import ContactForm from "@/components/landing/ContactForm";
 
 const SITE_URL = "https://prodegoat.app";
 
@@ -224,6 +225,17 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Contact */}
+      <section id="contacto" className="px-4 py-6">
+        <h2 className="mb-1 text-center text-[16px] font-bold drop-shadow">Contacto</h2>
+        <p className="mx-auto mb-3 max-w-md text-center text-[12.5px] text-blue-50/80">
+          ¿Dudas, sugerencias o querés reportar algo? Escribinos y te respondemos.
+        </p>
+        <div className="mx-auto max-w-md">
+          <ContactForm />
+        </div>
+      </section>
+
       {/* Final CTA */}
       <section className="px-4 py-8 text-center">
         <h2 className="text-[18px] font-bold drop-shadow">¿Listo para jugar?</h2>
@@ -244,6 +256,7 @@ export default function Landing() {
           <Link href="/prode" className="hover:text-white">Prode</Link>
           <Link href="/grupos" className="hover:text-white">Grupos</Link>
           <Link href="/teams" className="hover:text-white">Tabla y cruces</Link>
+          <a href="#contacto" className="hover:text-white">Contacto</a>
           <Link href="/login" className="hover:text-white">Iniciar sesión</Link>
         </nav>
         <p className="mt-4 text-[11px] text-blue-100/60">

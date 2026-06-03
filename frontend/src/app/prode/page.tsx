@@ -7,6 +7,7 @@ import Navbar from "@/components/layout/Navbar";
 import MatchCard from "@/components/match/MatchCard";
 import PredictionForm from "@/components/prode/PredictionForm";
 import TopScorerCard from "@/components/prode/TopScorerCard";
+import ChampionCard from "@/components/prode/ChampionCard";
 import { useMatches, usePredictions, useActiveColumnId, useMe } from "@/lib/api";
 import { getToken, getSelectedGroupId } from "@/lib/utils";
 import type { Match } from "@/types";
@@ -98,6 +99,7 @@ export default function ProdePage() {
       </header>
 
       <main className="px-4 pb-24 pt-3">
+        <ChampionCard columnId={columnId} />
         <TopScorerCard columnId={columnId} />
 
         {isLoading && <div className="h-28 animate-pulse rounded-xl border border-gray-200 bg-white" />}

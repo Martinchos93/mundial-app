@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft, MapPin } from "lucide-react";
-import { useMatch, usePredictions, useAIPrediction, useActiveColumnId } from "@/lib/api";
+import { useMatch, usePredictions, useAIPrediction, useActiveColumnId, useSettings } from "@/lib/api";
 import LiveStats from "@/components/match/LiveStats";
 import AIPredictionCard from "@/components/match/AIPredictionCard";
 import PredictionForm from "@/components/prode/PredictionForm";
@@ -34,6 +34,8 @@ export default function MatchDetailPage({ params }: { params: { id: string } }) 
   const { data: match, isLoading, error } = useMatch(params.id);
   const columnId = useActiveColumnId();
   const { data: ai, mutate: mutateAI } = useAIPrediction(params.id);
+  const { data: settings } = useSettings();
+  const aiEnabled = settings?.ai_enabled ?? false;
   const { data: predictions } = usePredictions();
   const existing = predictions?.find((p) => p.match_id === Number(params.id));
 
@@ -139,10 +141,12 @@ export default function MatchDetailPage({ params }: { params: { id: string } }) 
               </Section>
             )}
 
-            {/* AI prediction */}
-            <Section title="Predicción IA">
-              <AIPredictionCard match={match} prediction={ai} onRefresh={() => mutateAI()} />
-            </Section>
+            {/* AI prediction (admin-toggleable) */}
+            {aiEnabled && (
+              <Section title="Predicción IA">
+                <AIPredictionCard match={match} prediction={ai} onRefresh={() => mutateAI()} />
+              </Section>
+            )}
 
             {/* User prediction */}
             <Section title="Tu predicción">

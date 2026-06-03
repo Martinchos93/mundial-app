@@ -18,6 +18,7 @@ DEFAULT_SCORING_CONFIG: dict = {
     "pts_card": 2,  # per correctly predicted yellow card (player)
     "pts_card_red": 4,  # per correctly predicted red card (player)
     "pts_top_scorer": 10,  # correctly predicting the tournament top scorer
+    "pts_champion": 15,  # correctly predicting the tournament champion
 }
 
 

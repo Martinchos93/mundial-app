@@ -1,6 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import type { Match, Prediction } from "@/types";
 import { cn, formatMatchTime, timeUntilLock } from "@/lib/utils";
+import { useSettings } from "@/lib/api";
 
 interface Props {
   match: Match;
@@ -58,6 +61,8 @@ function PredChip({ prediction }: { prediction: Prediction }) {
 export default function MatchCard({ match, prediction, showPrediction, onSelect }: Props) {
   const showScore = match.status === "live" || match.status === "finished";
   const ai = match.ai_prediction;
+  const { data: settings } = useSettings();
+  const aiEnabled = settings?.ai_enabled ?? false;
 
   const className = cn(
     "block w-full rounded-xl border bg-white p-3.5 text-left transition-colors hover:shadow-sm",
@@ -94,7 +99,7 @@ export default function MatchCard({ match, prediction, showPrediction, onSelect 
           ) : (
             <span />
           )}
-          {ai?.suggested_score && (
+          {aiEnabled && ai?.suggested_score && (
             <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">
               IA: {ai.suggested_score}
             </span>

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Minus, Plus, Check, ChevronDown } from "lucide-react";
 import type { Match, Prediction, AIResult, PlayerEvent } from "@/types";
 import { cn, isLockExpired, getToken } from "@/lib/utils";
-import { submitPrediction } from "@/lib/api";
+import { submitPrediction, useSettings } from "@/lib/api";
 import PlayerEventsTable, { type EventMap } from "@/components/prode/PlayerEventsTable";
 
 interface Props {
@@ -93,6 +93,8 @@ function ScoredBox({ label, value }: { label: string; value: number }) {
 
 export default function PredictionForm({ match, existing, columnId, onSaved }: Props) {
   const token = getToken();
+  const { data: settings } = useSettings();
+  const aiEnabled = settings?.ai_enabled ?? false;
 
   const [home, setHome] = useState(existing?.pred_home_score ?? 0);
   const [away, setAway] = useState(existing?.pred_away_score ?? 0);
@@ -154,10 +156,11 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
         <div className="mb-3 grid grid-cols-3 gap-1.5">
           <ScoredBox label="Resultado" value={existing.pts_result} />
           <ScoredBox label="Goles" value={existing.pts_goals} />
-          <ScoredBox label="Score" value={existing.pts_exact_score} />
-          <ScoredBox label="Amarillas" value={existing.pts_yellows_scored} />
+          <ScoredBox label="Score exacto" value={existing.pts_exact_score} />
+          <ScoredBox label="🟨 Amarillas" value={existing.pts_yellows_scored} />
+          <ScoredBox label="🟥 Rojas" value={existing.pts_reds_scored} />
           <ScoredBox label="⚽ Goleadores" value={existing.pts_scorers} />
-          <ScoredBox label="🟨🟥 Tarjetas" value={existing.pts_cards} />
+          <ScoredBox label="🟨🟥 Tarjetas jug." value={existing.pts_cards} />
         </div>
         {scorers.length > 0 && (
           <p className="mb-1 text-[11px] text-gray-500">
@@ -297,7 +300,7 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
         </div>
       )}
 
-      {ai && <p className="mb-2.5 text-center text-[11px] text-gray-400">{ai}</p>}
+      {aiEnabled && ai && <p className="mb-2.5 text-center text-[11px] text-gray-400">{ai}</p>}
       {error && <p className="mb-2.5 text-center text-xs text-red-500">{error}</p>}
 
       {!locked && (

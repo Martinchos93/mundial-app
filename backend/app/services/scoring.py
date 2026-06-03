@@ -26,6 +26,7 @@ DEFAULT_CONFIG: dict[str, int] = {
     "pts_card": 2,
     "pts_card_red": 4,
     "pts_top_scorer": 10,
+    "pts_champion": 15,
 }
 
 # Anti-gaming cap: a user can pick at most this many players per category per

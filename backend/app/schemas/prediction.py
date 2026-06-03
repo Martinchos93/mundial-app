@@ -83,3 +83,17 @@ class TopScorerOut(BaseModel):
     leader: dict | None = None  # {name, goals} current tournament leader
     finished: bool = False  # whether the tournament is over (points awarded)
     points_value: int = 10
+
+
+class ChampionCreate(BaseModel):
+    column_id: int
+    team_name: str = Field(..., min_length=1, max_length=120)
+
+
+class ChampionOut(BaseModel):
+    column_id: int
+    pick: str | None = None  # the current user's pick
+    champion: str | None = None  # actual champion (when the final is played)
+    started: bool = False  # tournament kicked off → pick is locked
+    finished: bool = False
+    points_value: int = 15

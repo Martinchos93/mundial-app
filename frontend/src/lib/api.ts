@@ -584,6 +584,46 @@ export async function submitTopScorer(
   return res.data as TopScorerState;
 }
 
+// ---- Campeón del torneo -------------------------------------------------
+
+export interface ChampionState {
+  column_id: number;
+  pick: string | null;
+  champion: string | null;
+  started: boolean;
+  finished: boolean;
+  points_value: number;
+}
+
+export function useChampion(columnId: number | null) {
+  return useSWR<ChampionState>(
+    columnId ? `/predictions/champion?column_id=${columnId}` : null,
+    (url: string) => http.get(url).then((r) => r.data as ChampionState),
+  );
+}
+
+export async function submitChampion(columnId: number, teamName: string): Promise<ChampionState> {
+  const res = await http.post(`/predictions/champion`, { column_id: columnId, team_name: teamName });
+  return res.data as ChampionState;
+}
+
+// ---- App settings (feature flags) ---------------------------------------
+
+export interface AppSettings {
+  ai_enabled: boolean;
+}
+
+export function useSettings() {
+  return useSWR<AppSettings>("/settings", (url: string) => http.get(url).then((r) => r.data as AppSettings), {
+    revalidateOnFocus: false,
+  });
+}
+
+export async function setSetting(key: string, value: unknown): Promise<AppSettings> {
+  const res = await http.put(`/admin/settings`, { key, value });
+  return res.data as AppSettings;
+}
+
 export interface PlayerSearchResult {
   id: number;
   name: string;

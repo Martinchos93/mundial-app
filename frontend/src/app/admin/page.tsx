@@ -21,6 +21,8 @@ import {
   useMatches,
   setMatchResult,
   uploadMedia,
+  useSettings,
+  setSetting,
 } from "@/lib/api";
 import PlayerEventsTable, { type EventMap } from "@/components/prode/PlayerEventsTable";
 import { cn, formatFullDate, getToken, getUser } from "@/lib/utils";
@@ -265,6 +267,55 @@ function UsersTable() {
           <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="rounded-lg border border-gray-200 p-1.5 text-gray-500 disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button>
         </div>
       )}
+    </div>
+  );
+}
+
+function SettingsManager() {
+  const { data, mutate } = useSettings();
+  const [busy, setBusy] = useState(false);
+  const aiEnabled = data?.ai_enabled ?? false;
+
+  async function toggleAi() {
+    setBusy(true);
+    try {
+      await setSetting("ai_enabled", !aiEnabled);
+      await mutate();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3.5">
+      <div className="mb-2.5 text-[13px] font-medium text-gray-900">⚙️ Ajustes</div>
+      <div className="flex items-center justify-between">
+        <div className="pr-3">
+          <div className="text-[13px] text-gray-800">Predicción por IA</div>
+          <p className="text-[11px] text-gray-400">
+            Muestra/oculta el botón “Generar con IA” y los análisis de Claude en toda la app.
+          </p>
+        </div>
+        <button
+          onClick={toggleAi}
+          disabled={busy}
+          aria-pressed={aiEnabled}
+          className={cn(
+            "relative h-6 w-11 flex-none rounded-full transition-colors disabled:opacity-50",
+            aiEnabled ? "bg-blue-600" : "bg-gray-300",
+          )}
+        >
+          <span
+            className={cn(
+              "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
+              aiEnabled ? "translate-x-[22px]" : "translate-x-0.5",
+            )}
+          />
+        </button>
+      </div>
+      <p className="mt-2 text-[11px] text-gray-400">
+        Estado actual: <span className="font-medium text-gray-600">{aiEnabled ? "Encendida" : "Apagada"}</span>
+      </p>
     </div>
   );
 }
@@ -541,6 +592,7 @@ export default function AdminPage() {
       </header>
 
       <main className="px-4 pb-24 pt-3">
+        <SettingsManager />
         <ResultsManager />
         <UsersTable />
         <AdminsManager />

@@ -122,7 +122,67 @@ def test_default_config_values():
         "pts_card": 2,
         "pts_card_red": 4,
         "pts_top_scorer": 10,
+        "pts_champion": 15,
     }
+
+
+# ---- Total must always equal the sum of every component (the displayed bug) --
+
+_COMPONENTS = (
+    "pts_result", "pts_exact", "pts_yellows", "pts_reds",
+    "pts_bonus", "pts_scorers", "pts_cards",
+)
+
+
+def _assert_total_consistent(b):
+    assert b.total == sum(getattr(b, c) for c in _COMPONENTS), b.as_dict()
+
+
+def test_total_equals_sum_of_parts_simple():
+    _assert_total_consistent(score(pred_home=2, pred_away=0, actual_home=3, actual_away=1))
+
+
+def test_total_equals_sum_of_parts_full_house():
+    b = score(
+        pred_home=1, pred_away=2, actual_home=1, actual_away=2,
+        pred_yellows=3, pred_reds=1, actual_yellows=3, actual_reds=1,
+        pred_players=[{"name": "X", "g": 2}, {"name": "Y", "y": 1}],
+        actual_scorers=["X", "X"], actual_booked=["Y"], actual_reds_players=[],
+    )
+    _assert_total_consistent(b)
+
+
+def test_screenshot_case_mexico_1_4():
+    # Reproduces the report: away win predicted right (+3), exact yellow total
+    # (+1) AND exact red total (+1, reds 0==0). Visible boxes hid the reds, but
+    # the engine total must be 5 and equal the sum of parts.
+    b = score(
+        pred_home=0, pred_away=2, actual_home=1, actual_away=4,  # away win both, totals differ
+        pred_yellows=4, actual_yellows=4,  # exact yellows -> +1
+        pred_reds=0, actual_reds=0,        # exact reds   -> +1
+    )
+    assert b.pts_result == 3
+    assert b.pts_exact == 0
+    assert b.pts_yellows == 1
+    assert b.pts_reds == 1
+    assert b.total == 5
+    _assert_total_consistent(b)
+
+
+@pytest.mark.parametrize("ph,pa,ah,aa,py,pr,ay,ar", [
+    (0, 0, 0, 0, 0, 0, 0, 0),
+    (3, 1, 3, 1, 2, 1, 2, 1),
+    (1, 2, 4, 0, 5, 0, 1, 2),
+    (2, 2, 2, 2, 0, 0, 9, 3),
+])
+def test_total_consistent_matrix(ph, pa, ah, aa, py, pr, ay, ar):
+    b = calculate_score(
+        pred_home=ph, pred_away=pa, pred_yellows=py, pred_reds=pr,
+        actual_home=ah, actual_away=aa, actual_yellows=ay, actual_reds=ar,
+        pred_players=[{"name": "A", "g": 1, "y": 1}],
+        actual_scorers=["A"], actual_booked=["A"], actual_reds_players=[],
+    )
+    _assert_total_consistent(b)
 
 
 def test_pred_players_goals_count_based():

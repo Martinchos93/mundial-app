@@ -288,6 +288,18 @@ def is_tournament_finished(db: Session) -> bool:
     return bool(final and final.status == "finished")
 
 
+def tournament_champion(db: Session) -> str | None:
+    """Winner of the final (match 104), or None until it's played."""
+    final = db.query(Match).filter(Match.match_no == 104).one_or_none()
+    if not final or final.status != "finished" or final.home_score is None or final.away_score is None:
+        return None
+    if final.home_score > final.away_score:
+        return final.home_team
+    if final.away_score > final.home_score:
+        return final.away_team
+    return None
+
+
 def simulate(db: Session) -> dict:
     """Fill plausible results (probabilistic, biased by strength) + cards, and
     resolve the whole bracket. Knockout matches never tie. Re-run for a new

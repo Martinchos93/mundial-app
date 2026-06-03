@@ -922,3 +922,11 @@ export async function setMatchResult(
   const res = await http.post(`/admin/matches/${matchId}/result`, body);
   return res.data;
 }
+
+/** Undo a loaded result: back to scheduled, clear events and remove points. */
+export async function resetMatchResult(
+  matchId: number,
+): Promise<{ status: string; cleared_predictions: number }> {
+  const res = await http.post(`/admin/matches/${matchId}/reset-result`);
+  return res.data;
+}

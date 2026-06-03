@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, EmailStr
 
 from app.database import get_db
 from app.deps import get_current_admin
-from app.models import Column, Match, Prediction, User, Group, AIPrediction, Membership
+from app.models import Column, Match, Prediction, Score, User, Group, AIPrediction, Membership
 from app.models.column import DEFAULT_SCORING_CONFIG
 from app.schemas.column import ColumnCreate, ColumnUpdate, ColumnOut, ColumnStats
 from app.schemas.auth import UserOut
@@ -281,6 +281,38 @@ def set_match_result(match_id: int, payload: MatchResultIn, db: Session = Depend
         "score": f"{m.home_score}-{m.away_score}",
         "recalculated_predictions": recalculated,
     }
+
+
+@router.post("/matches/{match_id}/reset-result")
+def reset_match_result(match_id: int, db: Session = Depends(get_db)):
+    """Undo a loaded result: back to 'scheduled', clear score/events/cards and
+    remove the points it awarded (deletes Score rows + unlocks predictions)."""
+    m = db.get(Match, match_id)
+    if m is None:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    preds = db.query(Prediction).filter(Prediction.match_id == m.id).all()
+    pred_ids = [p.id for p in preds]
+    if pred_ids:
+        db.query(Score).filter(Score.prediction_id.in_(pred_ids)).delete(synchronize_session=False)
+    for p in preds:
+        p.locked = False
+
+    m.status = "scheduled"
+    m.home_score = m.away_score = m.minute = None
+    m.scorers = m.booked = m.red_players = None
+    m.home_yellows = m.home_reds = m.away_yellows = m.away_reds = 0
+    db.commit()
+
+    # Re-resolve the bracket from whatever is still finished.
+    try:
+        from app.services.bracket import resolve
+
+        resolve(db)
+    except Exception:  # noqa: BLE001
+        pass
+
+    return {"match_id": m.id, "status": m.status, "cleared_predictions": len(pred_ids)}
 
 
 @router.get("/stats")

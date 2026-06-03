@@ -20,6 +20,7 @@ import {
   useAdminUsers,
   useMatches,
   setMatchResult,
+  resetMatchResult,
   uploadMedia,
   useSettings,
   setSetting,
@@ -330,7 +331,7 @@ function matchToEvents(m: Match): EventMap {
 }
 
 function ResultsManager() {
-  const { data: matches } = useMatches();
+  const { data: matches, mutate } = useMatches();
   const [q, setQ] = useState("");
   const [selId, setSelId] = useState<number | null>(null);
   const [home, setHome] = useState(0);
@@ -357,8 +358,28 @@ function ResultsManager() {
       const players = Object.values(events).filter((e) => e.g || e.y || e.r);
       const res = await setMatchResult(sel.id, { home_score: home, away_score: away, players, finished: true });
       setMsg(`✅ ${res.score} guardado · ${res.recalculated_predictions} predicciones recalculadas`);
+      await mutate();
     } catch {
       setMsg("No se pudo guardar.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function undo() {
+    if (!sel) return;
+    if (!window.confirm("¿Borrar el resultado de este partido? Vuelve a 'sin jugar' y se quitan los puntos que sumó.")) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await resetMatchResult(sel.id);
+      setMsg(`↩️ Resultado borrado · ${res.cleared_predictions} predicciones reabiertas`);
+      setHome(0);
+      setAway(0);
+      setEvents({});
+      await mutate();
+    } catch {
+      setMsg("No se pudo borrar.");
     } finally {
       setBusy(false);
     }
@@ -457,8 +478,17 @@ function ResultsManager() {
             disabled={busy}
             className="mt-2.5 w-full rounded-[10px] bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
           >
-            {busy ? "Guardando…" : "Guardar y contabilizar puntos"}
+            {busy ? "Guardando…" : sel.status === "finished" ? "Actualizar resultado" : "Guardar y contabilizar puntos"}
           </button>
+          {sel.status === "finished" && (
+            <button
+              onClick={undo}
+              disabled={busy}
+              className="mt-2 w-full rounded-[10px] border border-red-200 py-2 text-[13px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+            >
+              ↩️ Borrar resultado (volver a “sin jugar”)
+            </button>
+          )}
         </>
       )}
     </div>

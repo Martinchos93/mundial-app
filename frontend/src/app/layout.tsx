@@ -54,6 +54,11 @@ export const metadata: Metadata = {
     follow: true,
     googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 },
   },
+  // Google Search Console ownership. Set GOOGLE_SITE_VERIFICATION in Vercel env
+  // to the token from the "HTML tag" method (no code change needed).
+  verification: process.env.GOOGLE_SITE_VERIFICATION
+    ? { google: process.env.GOOGLE_SITE_VERIFICATION }
+    : undefined,
   // Favicon comes from the file-based convention (app/icon.svg) — the World Cup trophy.
   appleWebApp: { capable: true, title: "ProdeGoat", statusBarStyle: "default" },
 };

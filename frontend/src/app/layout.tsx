@@ -113,7 +113,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
         />
         <SWRProvider>
-          <div className="mx-auto min-h-screen max-w-lg bg-gray-50">{children}</div>
+          {/* Transparent wrapper so the landing's video background shows; app
+              pages still sit on the body's gray-50. */}
+          <div className="mx-auto min-h-screen max-w-lg">{children}</div>
         </SWRProvider>
       </body>
     </html>

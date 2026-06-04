@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { isToday, parseISO } from "date-fns";
 import { Bell } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import MatchCard from "@/components/match/MatchCard";
-import { useMatches, usePredictions, useNews } from "@/lib/api";
-import { cn, formatMatchDate, groupMatchesByDay, timezoneLabel } from "@/lib/utils";
+import ProdeSwitcher from "@/components/prode/ProdeSwitcher";
+import { useMatches, usePredictions, useNews, useGroupColumns } from "@/lib/api";
+import { cn, formatMatchDate, groupMatchesByDay, timezoneLabel, getSelectedGroupId, setSelectedGroupId } from "@/lib/utils";
 import type { Match } from "@/types";
 
 type Filter = "all" | "live" | "today" | "finished";
@@ -41,12 +42,31 @@ export default function FixturePage() {
   const { data: news } = useNews();
   const [filter, setFilter] = useState<Filter>("all");
 
+  // Which prode we're viewing (predictions are per-prode).
+  const [groupId, setGroupId] = useState<number | null>(null);
+  useEffect(() => {
+    const g = getSelectedGroupId();
+    if (g) setGroupId(Number(g));
+  }, []);
+  const { data: columns } = useGroupColumns(groupId);
+  const columnId = useMemo(() => {
+    if (!columns?.length) return null;
+    return (columns.find((c) => c.status === "active") ?? columns[0]).id;
+  }, [columns]);
+
+  function switchProde(id: number) {
+    setGroupId(id);
+    setSelectedGroupId(id);
+  }
+
   const grouped = useMemo(() => {
     if (!data) return new Map<string, Match[]>();
     return groupMatchesByDay(applyFilter(data, filter));
   }, [data, filter]);
 
-  const findPred = (matchId: number) => predictions?.find((p) => p.match_id === matchId);
+  // Only the selected prode's prediction for each match.
+  const findPred = (matchId: number) =>
+    predictions?.find((p) => p.match_id === matchId && (columnId == null || p.column_id === columnId));
 
   return (
     <>
@@ -57,6 +77,8 @@ export default function FixturePage() {
         </div>
         <Bell className="h-5 w-5 text-gray-400" />
       </header>
+
+      <ProdeSwitcher value={groupId} onChange={switchProde} className="border-b border-gray-100 bg-white px-4 pb-2.5" />
 
       <div className="flex gap-2 border-b border-gray-100 bg-white px-4 pb-3">
         {FILTERS.map((f) => (

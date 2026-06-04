@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
@@ -9,8 +9,9 @@ import PredictionForm from "@/components/prode/PredictionForm";
 import TopScorerCard from "@/components/prode/TopScorerCard";
 import ChampionCard from "@/components/prode/ChampionCard";
 import GroupLeaderboardCard from "@/components/prode/GroupLeaderboardCard";
-import { useMatches, usePredictions, useActiveColumnId, useMe } from "@/lib/api";
-import { getToken, getSelectedGroupId, getUserId } from "@/lib/utils";
+import ProdeSwitcher from "@/components/prode/ProdeSwitcher";
+import { useMatches, usePredictions, useGroupColumns, useMe } from "@/lib/api";
+import { getToken, getSelectedGroupId, setSelectedGroupId, getUserId } from "@/lib/utils";
 import type { Match } from "@/types";
 
 function PendingNotice() {
@@ -43,14 +44,26 @@ function NoProde({ title, body, cta }: { title: string; body: string; cta: strin
 
 export default function ProdePage() {
   const token = getToken();
-  const groupId = getSelectedGroupId();
-  const columnId = useActiveColumnId();
-
+  const [groupId, setGroupId] = useState<number | null>(() => {
+    const g = getSelectedGroupId();
+    return g ? Number(g) : null;
+  });
   const [selected, setSelected] = useState<Match | null>(null);
 
   const { data: me } = useMe();
   const { data: matches, isLoading } = useMatches();
   const { data: predictions, mutate: mutatePreds } = usePredictions();
+  const { data: columns } = useGroupColumns(groupId);
+  const columnId = useMemo(() => {
+    if (!columns?.length) return null;
+    return (columns.find((c) => c.status === "active") ?? columns[0]).id;
+  }, [columns]);
+
+  function switchProde(id: number) {
+    setGroupId(id);
+    setSelectedGroupId(id);
+    setSelected(null);
+  }
 
   if (!token) return <NoProde title="Iniciá sesión" body="Necesitás una cuenta para jugar al prode." cta="Ir a iniciar sesión" />;
   if (!groupId) return <NoProde title="Elegí un prode" body="Creá o unite a un prode para empezar a predecir." cta="Ir a Prodes" />;
@@ -59,7 +72,8 @@ export default function ProdePage() {
   const group = membership ? { name: membership.group_name } : null;
   if (membership && membership.status === "pending") return <PendingNotice />;
 
-  const findPred = (matchId: number) => predictions?.find((p) => p.match_id === matchId);
+  const findPred = (matchId: number) =>
+    predictions?.find((p) => p.match_id === matchId && (columnId == null || p.column_id === columnId));
   const upcoming = (matches ?? []).filter((m) => m.status === "scheduled");
   const resolved = (matches ?? []).filter((m) => m.status === "finished" && findPred(m.id));
 
@@ -97,6 +111,7 @@ export default function ProdePage() {
       <header className="sticky top-0 z-30 border-b border-gray-100 bg-white px-4 py-3">
         <h1 className="text-base font-semibold text-gray-900">{group?.name ?? "Prode"}</h1>
         <p className="text-[11px] text-gray-400">Predecí los próximos partidos</p>
+        <ProdeSwitcher value={groupId} onChange={switchProde} className="mt-2" />
       </header>
 
       <main className="px-4 pb-24 pt-3">

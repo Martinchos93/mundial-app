@@ -516,6 +516,33 @@ export function useLeaderboard(groupId: string | number | null) {
   );
 }
 
+export interface BreakdownMember {
+  user_id: number;
+  name: string;
+  avatar_emoji: string;
+}
+export interface BreakdownMatch {
+  id: number;
+  home_team: string;
+  away_team: string;
+  home_score: number | null;
+  away_score: number | null;
+  phase: string | null;
+  kickoff_utc: string | null;
+  points: Record<string, number>;
+}
+export interface GroupBreakdown {
+  members: BreakdownMember[];
+  matches: BreakdownMatch[];
+}
+
+export function useBreakdown(groupId: string | number | null) {
+  return useSWR<GroupBreakdown>(
+    groupId ? `/groups/${groupId}/breakdown` : null,
+    (url: string) => http.get(url).then((r) => r.data as GroupBreakdown),
+  );
+}
+
 export function usePredictions() {
   const token = getToken();
   return useSWR<Prediction[]>(token ? "/predictions" : null, (url: string) =>

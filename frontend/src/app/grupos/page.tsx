@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, LogIn, Copy, Check, UserCheck, X, LogOut, Crown } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
+import GroupBreakdown from "@/components/prode/GroupBreakdown";
 import {
   useMe,
   useLeaderboard,
@@ -92,11 +93,17 @@ function SelectedProde({ m, userId }: { m: MembershipInfo; userId: number }) {
         </>
       )}
 
-      <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-gray-400">Posiciones</p>
+      <p className="mb-2 flex items-center justify-between text-[11px] font-medium uppercase tracking-wider text-gray-400">
+        <span>Integrantes y puntos</span>
+        <span className="font-normal lowercase tracking-normal text-gray-400">{(leaderboard ?? []).length} jugando</span>
+      </p>
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
         {(leaderboard ?? []).map((e, i) => <LeaderRow key={e.user_id} e={e} rank={i + 1} isMe={e.user_id === userId} />)}
-        {leaderboard?.length === 0 && <p className="px-3.5 py-6 text-center text-sm text-gray-400">Todavía no hay puntos.</p>}
+        {leaderboard?.length === 0 && <p className="px-3.5 py-6 text-center text-sm text-gray-400">Todavía no hay integrantes.</p>}
       </div>
+
+      <p className="mb-2 mt-5 text-[11px] font-medium uppercase tracking-wider text-gray-400">Cuánto sumó cada uno por partido</p>
+      <GroupBreakdown groupId={gid} userId={userId} />
     </div>
   );
 }

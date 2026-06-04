@@ -91,6 +91,57 @@ def leaderboard(group_id: int, db: Session = Depends(get_db)):
     return Leaderboard(group_id=group_id, entries=entries)
 
 
+@router.get("/{group_id}/breakdown")
+def breakdown(group_id: int, db: Session = Depends(get_db)):
+    """Per-match points for every member: who summed how much in each match."""
+    if db.get(Group, group_id) is None:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    users = (
+        db.query(User)
+        .join(Membership, Membership.user_id == User.id)
+        .filter(Membership.group_id == group_id, Membership.status == "active")
+        .all()
+    )
+    member_ids = [u.id for u in users]
+    members = [
+        {"user_id": u.id, "name": u.display_name, "avatar_emoji": u.avatar_emoji} for u in users
+    ]
+    if not member_ids:
+        return {"members": [], "matches": []}
+
+    rows = (
+        db.query(Prediction.user_id, Prediction.match_id, Score.total)
+        .join(Score, Score.prediction_id == Prediction.id)
+        .join(Match, Match.id == Prediction.match_id)
+        .filter(Prediction.user_id.in_(member_ids), Match.status == "finished")
+        .all()
+    )
+    points: dict[int, dict[int, int]] = {}
+    for uid, mid, total in rows:
+        points.setdefault(mid, {})[uid] = int(total or 0)
+
+    matches = (
+        db.query(Match).filter(Match.id.in_(points.keys())).order_by(Match.kickoff_utc.desc()).all()
+        if points
+        else []
+    )
+    matches_out = [
+        {
+            "id": m.id,
+            "home_team": m.home_team,
+            "away_team": m.away_team,
+            "home_score": m.home_score,
+            "away_score": m.away_score,
+            "phase": m.phase,
+            "kickoff_utc": m.kickoff_utc.isoformat() if m.kickoff_utc else None,
+            "points": points.get(m.id, {}),
+        }
+        for m in matches
+    ]
+    return {"members": members, "matches": matches_out}
+
+
 @router.get("/{group_id}/leaderboard/live", response_model=Leaderboard)
 def leaderboard_live(group_id: int, db: Session = Depends(get_db)):
     if db.get(Group, group_id) is None:

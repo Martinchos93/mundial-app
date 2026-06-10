@@ -45,7 +45,8 @@ class Settings(BaseSettings):
     WORLD_CUP_SEASON: int = 2026
 
     # Prediction lock: minutes before kickoff that predictions close
-    PREDICTION_LOCK_MINUTES: int = 60
+    # Minutes before kickoff that predictions lock. 0 = editable until kickoff.
+    PREDICTION_LOCK_MINUTES: int = 0
 
     @property
     def cors_origins_list(self) -> list[str]:

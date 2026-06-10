@@ -21,7 +21,7 @@ function shortName(m: Match, side: "home" | "away") {
 }
 
 function lockShort(kickoffIso: string): string {
-  const mins = Math.max(0, Math.round((Date.parse(kickoffIso) - 60 * 60 * 1000 - Date.now()) / 60000));
+  const mins = Math.max(0, Math.round((Date.parse(kickoffIso) - Date.now()) / 60000));
   const h = Math.floor(mins / 60);
   return h >= 1 ? `${h}h` : `${mins}m`;
 }

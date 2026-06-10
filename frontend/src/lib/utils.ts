@@ -33,14 +33,13 @@ export function formatFullDate(iso: string): string {
   return format(parseISO(iso), "d MMM · HH:mm", { locale: es });
 }
 
-/** Predictions lock 1 hour before kickoff. */
+/** Predictions are editable until kickoff (lock at the match start time). */
 export function isLockExpired(kickoffIso: string): boolean {
-  const lockAt = parseISO(kickoffIso).getTime() - 60 * 60 * 1000;
-  return Date.now() >= lockAt;
+  return Date.now() >= parseISO(kickoffIso).getTime();
 }
 
 export function timeUntilLock(kickoffIso: string): string {
-  const lockAt = parseISO(kickoffIso).getTime() - 60 * 60 * 1000;
+  const lockAt = parseISO(kickoffIso).getTime();
   const mins = Math.max(0, Math.round((lockAt - Date.now()) / 60000));
   if (mins <= 0) return "Cerrada";
   const h = Math.floor(mins / 60);

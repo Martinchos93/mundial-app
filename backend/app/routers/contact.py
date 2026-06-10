@@ -44,6 +44,17 @@ def list_contact(db: Session = Depends(get_db)):
     return [ContactOut.model_validate(r) for r in rows]
 
 
+@admin_router.post("/contact/read-all")
+def mark_all_read(db: Session = Depends(get_db)):
+    n = (
+        db.query(ContactMessage)
+        .filter(ContactMessage.handled == False)  # noqa: E712
+        .update({"handled": True}, synchronize_session=False)
+    )
+    db.commit()
+    return {"updated": int(n or 0)}
+
+
 @admin_router.post("/contact/{msg_id}/handled", response_model=ContactOut)
 def mark_handled(msg_id: int, db: Session = Depends(get_db)):
     m = db.get(ContactMessage, msg_id)

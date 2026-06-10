@@ -26,6 +26,7 @@ import {
   setSetting,
   useContactMessages,
   toggleContactHandled,
+  markAllContactRead,
   deleteContact,
 } from "@/lib/api";
 import PlayerEventsTable, { type EventMap } from "@/components/prode/PlayerEventsTable";
@@ -279,9 +280,24 @@ function ContactManager() {
   const { data, mutate } = useContactMessages();
   const messages = data ?? [];
   const pending = messages.filter((m) => !m.handled).length;
+  const autoRead = useRef(false);
+
+  // Mark everything as read once the inbox is opened/loaded.
+  useEffect(() => {
+    if (autoRead.current) return;
+    if (data && data.some((m) => !m.handled)) {
+      autoRead.current = true;
+      markAllContactRead().then(() => mutate());
+    }
+  }, [data, mutate]);
 
   async function toggle(id: number) {
     await toggleContactHandled(id);
+    mutate();
+  }
+
+  async function markAll() {
+    await markAllContactRead();
     mutate();
   }
   async function remove(id: number) {
@@ -292,11 +308,18 @@ function ContactManager() {
 
   return (
     <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3.5">
-      <div className="mb-2.5 flex items-center justify-between">
+      <div className="mb-2.5 flex items-center justify-between gap-2">
         <div className="text-[13px] font-medium text-gray-900">✉️ Mensajes de contacto</div>
-        <span className="text-[11px] text-gray-400">
-          {messages.length} en total{pending > 0 ? ` · ${pending} sin leer` : ""}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-gray-400">
+            {messages.length} en total{pending > 0 ? ` · ${pending} sin leer` : ""}
+          </span>
+          {pending > 0 && (
+            <button onClick={markAll} className="rounded-lg border border-gray-200 px-2 py-0.5 text-[11px] text-gray-600 hover:bg-gray-50">
+              Marcar todas leídas
+            </button>
+          )}
+        </div>
       </div>
       {messages.length === 0 && <p className="py-4 text-center text-[12px] text-gray-400">Todavía no hay mensajes.</p>}
       <div className="space-y-2">

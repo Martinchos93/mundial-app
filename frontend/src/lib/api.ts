@@ -676,6 +676,10 @@ export async function toggleContactHandled(id: number): Promise<void> {
   await http.post(`/admin/contact/${id}/handled`);
 }
 
+export async function markAllContactRead(): Promise<void> {
+  await http.post(`/admin/contact/read-all`);
+}
+
 export async function deleteContact(id: number): Promise<void> {
   await http.delete(`/admin/contact/${id}`);
 }

@@ -10,7 +10,6 @@ import {
   createNews,
   updateNews,
   deleteNews,
-  simulateTournament,
   syncSquads,
   useAdmins,
   createAdmin,
@@ -101,7 +100,7 @@ function AdminsManager() {
 }
 
 function TournamentTools() {
-  const [busy, setBusy] = useState<"sim" | "squads" | null>(null);
+  const [busy, setBusy] = useState<"squads" | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
   async function squads() {
@@ -120,32 +119,20 @@ function TournamentTools() {
     }
   }
 
-  async function sim() {
-    setBusy("sim");
-    setMsg(null);
-    try {
-      const r = await simulateTournament();
-      setMsg(r.champion ? `🏆 Campeón simulado: ${r.champion}. Mirá WC → Cruces.` : "Torneo simulado.");
-    } catch {
-      setMsg("No se pudo simular.");
-    } finally {
-      setBusy(null);
-    }
-  }
   return (
     <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3.5">
       <div className="text-[13px] font-medium text-gray-900">Herramientas del torneo</div>
       <p className="mt-0.5 text-[11px] text-gray-400">
-        Simulá resultados para probar las tablas y el cuadro. El botón “Reiniciar” está deshabilitado
-        para no borrar resultados ni pronósticos.
+        “Simular” y “Reiniciar” están deshabilitados durante el torneo real para no sobreescribir
+        resultados ni borrar pronósticos.
       </p>
       <div className="mt-3 flex gap-2">
         <button
-          onClick={sim}
-          disabled={busy !== null}
-          className="flex-1 rounded-lg bg-blue-600 py-2 text-[13px] font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+          disabled
+          title="Deshabilitado: sobreescribiría los resultados reales"
+          className="flex-1 cursor-not-allowed rounded-lg border border-gray-200 bg-gray-50 py-2 text-[13px] text-gray-300"
         >
-          {busy === "sim" ? "Simulando..." : "⚡ Simular Mundial"}
+          🔒 Simular Mundial
         </button>
         <button
           disabled

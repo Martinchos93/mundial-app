@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_admin
 from app.models import Match
-from app.services.bracket import resolve, simulate
+from app.services.bracket import resolve
 
 router = APIRouter(tags=["bracket"])
 
@@ -58,9 +58,15 @@ def recompute(db: Session = Depends(get_db)):
 
 
 @router.post("/admin/bracket/simulate", dependencies=[Depends(get_current_admin)])
-def simulate_tournament(db: Session = Depends(get_db)):
-    """Demo: fill plausible results for every match and resolve the full bracket."""
-    return simulate(db)
+def simulate_tournament():
+    """DISABLED during the real tournament: simulating would overwrite real
+    results with fake ones."""
+    from fastapi import HTTPException
+
+    raise HTTPException(
+        status_code=403,
+        detail="Simular está deshabilitado: sobreescribiría los resultados reales.",
+    )
 
 
 @router.post("/admin/bracket/reset", dependencies=[Depends(get_current_admin)])

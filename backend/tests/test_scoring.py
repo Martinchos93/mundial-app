@@ -45,19 +45,28 @@ def test_result_only_away_win():
     assert b.total == 3
 
 
-def test_exact_goals_without_result():
-    # Same total goals (2) but wrong winner -> exact goals only, no result, no bonus
+def test_same_total_goals_but_wrong_scoreline_no_exact():
+    # Same total goals (2) but different scoreline + wrong winner -> nothing.
     b = score(pred_home=2, pred_away=0, actual_home=0, actual_away=2)
     assert b.pts_result == 0
-    assert b.pts_exact == 2
+    assert b.pts_exact == 0  # 2-0 != 0-2: not the exact scoreline
     assert b.pts_bonus == 0
-    assert b.total == 2
+    assert b.total == 0
 
 
-def test_result_and_exact_goals_gives_bonus():
-    # Correct winner AND correct total goals (but not necessarily exact scoreline)
+def test_correct_result_wrong_scoreline_no_goals_points():
+    # The user's case: actual 3-0, predicted 2-1. Same winner + same total goals,
+    # but NOT the exact scoreline -> only the result counts, no goals/bonus.
     b = score(pred_home=2, pred_away=1, actual_home=3, actual_away=0)
-    # pred home win, total 3 ; actual home win, total 3 -> result + exact + bonus
+    assert b.pts_result == 3
+    assert b.pts_exact == 0
+    assert b.pts_bonus == 0
+    assert b.total == 3
+
+
+def test_exact_scoreline_gives_goals_and_bonus():
+    # Exact scoreline 2-1 == 2-1 -> result + exact + bonus.
+    b = score(pred_home=2, pred_away=1, actual_home=2, actual_away=1)
     assert b.pts_result == 3
     assert b.pts_exact == 2
     assert b.pts_bonus == 3

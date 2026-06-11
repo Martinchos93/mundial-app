@@ -6,8 +6,7 @@ import { cn } from "@/lib/utils";
 
 const ROWS: { label: string; pts: string; group?: string }[] = [
   { label: "Resultado (ganador o empate)", pts: "+3", group: "Por partido" },
-  { label: "Total de goles del partido exacto", pts: "+2" },
-  { label: "Bonus: resultado + total de goles", pts: "+3" },
+  { label: "Marcador exacto (ej. 2-1 = 2-1)", pts: "+5" },
   { label: "Total de amarillas del partido", pts: "+1" },
   { label: "Total de rojas del partido", pts: "+1" },
   { label: "⚽ Goleador acertado (por cada gol)", pts: "+3 c/u", group: "Por jugador" },
@@ -54,7 +53,8 @@ export default function ScoringLegend() {
             </tbody>
           </table>
           <p className="mt-2.5 rounded-lg bg-blue-50 px-2.5 py-2 text-[11px] text-blue-700">
-            Ej.: si acertás el <b>resultado</b> y el <b>total de goles</b>, sumás 3 + 2 + <b>3 de bonus</b> = <b>8</b> en ese partido.
+            Ej.: si acertás el <b>marcador exacto</b> (2-1 = 2-1) sumás <b>+3</b> (resultado) + <b>+5</b> (marcador) = <b>8</b>.
+            Si ponés 3-0 a un 2-1, solo cobrás el resultado (+3): el marcador no es exacto.
           </p>
           <p className="mt-2 text-[10.5px] text-gray-400">
             🥇 El goleador y 🏆 el campeón del torneo se pueden cambiar hasta el último partido de la 1ª fecha.

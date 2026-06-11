@@ -155,8 +155,7 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
         </div>
         <div className="mb-3 grid grid-cols-3 gap-1.5">
           <ScoredBox label="Resultado" value={existing.pts_result} />
-          <ScoredBox label="Goles" value={existing.pts_goals} />
-          <ScoredBox label="Score exacto" value={existing.pts_exact_score} />
+          <ScoredBox label="Marcador exacto" value={existing.pts_goals + existing.pts_exact_score} />
           <ScoredBox label="🟨 Amarillas" value={existing.pts_yellows_scored} />
           <ScoredBox label="🟥 Rojas" value={existing.pts_reds_scored} />
           <ScoredBox label="⚽ Goleadores" value={existing.pts_scorers} />

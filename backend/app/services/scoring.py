@@ -2,10 +2,10 @@
 
 Rules (defaults, overridable via column.scoring_config):
   - Correct result (winner or draw):        +3   (pts_result)
-  - Exact total goals of the match:          +2   (pts_exact_goals)
+  - Exact scoreline (e.g. 2-1 == 2-1):       +2   (pts_exact_goals)
   - Exact total yellow cards:                +1   (pts_yellows)
   - Exact total red cards:                   +1   (pts_reds)
-  - Bonus: correct result AND exact goals:   +3   (pts_bonus)
+  - Bonus for the exact scoreline:           +3   (pts_bonus)
 
 The engine is intentionally free of DB/ORM coupling so it can be unit
 tested in isolation. `calculate_score` accepts plain values; a thin
@@ -18,10 +18,10 @@ from typing import Any
 
 DEFAULT_CONFIG: dict[str, int] = {
     "pts_result": 3,
-    "pts_exact_goals": 2,
+    "pts_exact_goals": 2,  # exact scoreline (2-1 == 2-1), not total goals
     "pts_yellows": 1,
     "pts_reds": 1,
-    "pts_bonus": 3,
+    "pts_bonus": 3,  # extra for the exact scoreline
     "pts_scorer": 3,
     "pts_card": 2,
     "pts_card_red": 4,
@@ -147,17 +147,18 @@ def calculate_score(
     breakdown = ScoreBreakdown()
 
     result_correct = _outcome(pred_home, pred_away) == _outcome(actual_home, actual_away)
-    goals_exact = (pred_home + pred_away) == (actual_home + actual_away)
+    # Exact scoreline (e.g. 2-1 == 2-1), NOT just the total number of goals.
+    exact_score = pred_home == actual_home and pred_away == actual_away
 
     if result_correct:
         breakdown.pts_result = int(cfg["pts_result"])
-    if goals_exact:
+    if exact_score:
         breakdown.pts_exact = int(cfg["pts_exact_goals"])
     if pred_yellows == actual_yellows:
         breakdown.pts_yellows = int(cfg["pts_yellows"])
     if pred_reds == actual_reds:
         breakdown.pts_reds = int(cfg["pts_reds"])
-    if result_correct and goals_exact:
+    if exact_score:  # exact scoreline implies the result is correct too
         breakdown.pts_bonus = int(cfg["pts_bonus"])
 
     # Per-player picks. Prefer the count-based pred_players; fall back to the

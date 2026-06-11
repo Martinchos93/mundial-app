@@ -146,13 +146,19 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
     };
     return (
       <div className="rounded-xl border border-gray-200 bg-white p-3.5">
-        <div className="mb-3.5 flex items-center justify-between">
+        <div className="mb-1.5 flex items-center justify-between">
           <span className="text-[13px] font-medium text-gray-900">
             {match.home_team?.flag_emoji} {homeName} {match.home_score}-{match.away_score} {awayName}{" "}
             {match.away_team?.flag_emoji}
           </span>
           <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-500">🔒 Cerrada</span>
         </div>
+        <p className="mb-3 text-[11px] text-gray-400">
+          Tu predicción:{" "}
+          <span className="font-medium text-gray-600">
+            {existing.pred_home_score}-{existing.pred_away_score}
+          </span>
+        </p>
         <div className="mb-3 grid grid-cols-3 gap-1.5">
           <ScoredBox label="Resultado" value={existing.pts_result} />
           <ScoredBox label="Marcador exacto" value={existing.pts_goals + existing.pts_exact_score} />

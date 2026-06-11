@@ -136,20 +136,36 @@ def fetch_and_apply(db: Session) -> dict:
             )
             .first()
         )
-        if m is None or m.status == "finished":
-            continue  # untouched once finalized (preserves manual edits)
+        if m is None:
+            continue
 
         new_status = _status_of(g)
-        if new_status == "scheduled":
-            continue  # nothing to apply yet
 
-        # Orient scores/cards to our home/away.
+        # Orient scores/cards/scorers to our home/away. promiedos team.goals is
+        # a list of goal events with player_name.
         s0, s1 = _score_of(g)
         r0, r1 = _int(teams[0].get("red_cards")), _int(teams[1].get("red_cards"))
+        g0 = [str(x.get("player_name") or "").strip() for x in (teams[0].get("goals") or [])]
+        g1 = [str(x.get("player_name") or "").strip() for x in (teams[1].get("goals") or [])]
+        g0 = [x for x in g0 if x]
+        g1 = [x for x in g1 if x]
         if m.home_team == n0:
-            hs, as_, hr, ar = s0, s1, r0, r1
+            hs, as_, hr, ar, hg, ag = s0, s1, r0, r1, g0, g1
         else:
-            hs, as_, hr, ar = s1, s0, r1, r0
+            hs, as_, hr, ar, hg, ag = s1, s0, r1, r0, g1, g0
+
+        # Already finalized: only fill MISSING goalscorers (never overwrite a
+        # manual result), then re-score so the goleadores points land.
+        if m.status == "finished":
+            if not m.scorers and (hg or ag) and m.home_score == hs and m.away_score == as_:
+                m.scorers = (hg + ag) or None
+                db.flush()
+                recalculate_match_scores(db, m)
+                updated += 1
+            continue
+
+        if new_status == "scheduled":
+            continue  # nothing to apply yet
 
         changed = m.status != new_status
         m.status = new_status
@@ -161,6 +177,7 @@ def fetch_and_apply(db: Session) -> dict:
             m.home_reds = hr
         if ar is not None:
             m.away_reds = ar
+        m.scorers = (hg + ag) or None  # goalscorer names (for Stats + scoring)
         gt = _int(g.get("game_time"))
         m.minute = gt if (gt is not None and gt >= 0) else None
 

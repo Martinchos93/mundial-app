@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import MatchCard from "@/components/match/MatchCard";
+import MatchAccordion from "@/components/match/MatchAccordion";
 import PredictionForm from "@/components/prode/PredictionForm";
 import TopScorerCard from "@/components/prode/TopScorerCard";
 import ChampionCard from "@/components/prode/ChampionCard";
@@ -75,11 +76,6 @@ export default function ProdePage() {
 
   const findPred = (matchId: number) =>
     predictions?.find((p) => p.match_id === matchId && (columnId == null || p.column_id === columnId));
-  const upcoming = (matches ?? []).filter((m) => m.status === "scheduled");
-  // Matches already started (live or finished): always shown, predicted or not.
-  const played = (matches ?? [])
-    .filter((m) => m.status === "live" || m.status === "finished")
-    .sort((a, b) => Date.parse(a.kickoff_at) - Date.parse(b.kickoff_at));
 
   if (selected) {
     return (
@@ -126,32 +122,23 @@ export default function ProdePage() {
 
         {isLoading && <div className="h-28 animate-pulse rounded-xl border border-gray-200 bg-white" />}
 
-        <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-gray-400">Por predecir</p>
-        <div className="space-y-2">
-          {upcoming.length === 0 && (
-            <p className="py-6 text-center text-sm text-gray-400">No hay partidos por predecir.</p>
-          )}
-          {upcoming.map((m) => (
-            <MatchCard key={m.id} match={m} prediction={findPred(m.id)} showPrediction onSelect={setSelected} />
-          ))}
-        </div>
-
-        {played.length > 0 && (
-          <>
-            <p className="mb-2 mt-5 text-[11px] font-medium uppercase tracking-wider text-gray-400">
-              En vivo y finalizados
-            </p>
-            <div className="space-y-2">
-              {played.map((m) =>
-                findPred(m.id) ? (
-                  <PredictionForm key={m.id} match={m} existing={findPred(m.id)} />
-                ) : (
-                  <MatchCard key={m.id} match={m} />
-                ),
-              )}
-            </div>
-          </>
-        )}
+        <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-gray-400">Partidos</p>
+        <MatchAccordion
+          matches={matches ?? []}
+          scrollToFocus={false}
+          emptyText="No hay partidos."
+          renderMatch={(m) => {
+            const pred = findPred(m.id);
+            if (m.status === "scheduled") {
+              return <MatchCard key={m.id} match={m} prediction={pred} showPrediction onSelect={setSelected} />;
+            }
+            return pred ? (
+              <PredictionForm key={m.id} match={m} existing={pred} />
+            ) : (
+              <MatchCard key={m.id} match={m} />
+            );
+          }}
+        />
       </main>
 
       <Navbar />

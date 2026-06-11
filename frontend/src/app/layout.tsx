@@ -1,9 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
+import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 import SWRProvider from "@/components/providers/SWRProvider";
 
 const inter = Inter({ subsets: ["latin"] });
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
 const SITE_URL = "https://prodegoat.app";
 const TITLE = "ProdeGoat — Prode del Mundial 2026 con amigos, IA y stats en vivo";
@@ -117,6 +120,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               pages still sit on the body's gray-50. */}
           <div className="mx-auto min-h-screen max-w-lg">{children}</div>
         </SWRProvider>
+
+        {/* Visit analytics (Vercel — no config beyond enabling it in the dashboard) */}
+        <Analytics />
+
+        {/* Optional Google Analytics 4 — set NEXT_PUBLIC_GA_ID (G-XXXXXXX) in Vercel */}
+        {GA_ID && (
+          <>
+            <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />
+            <Script id="ga4" strategy="afterInteractive">
+              {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_ID}');`}
+            </Script>
+          </>
+        )}
       </body>
     </html>
   );

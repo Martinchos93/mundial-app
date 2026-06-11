@@ -28,6 +28,7 @@ import {
   toggleContactHandled,
   markAllContactRead,
   deleteContact,
+  useActiveUsers,
 } from "@/lib/api";
 import PlayerEventsTable, { type EventMap } from "@/components/prode/PlayerEventsTable";
 import { cn, formatFullDate, getToken, getUser } from "@/lib/utils";
@@ -280,6 +281,29 @@ function UsersTable() {
           <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="rounded-lg border border-gray-200 p-1.5 text-gray-500 disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button>
         </div>
       )}
+    </div>
+  );
+}
+
+function ActiveUsersCard() {
+  const { data } = useActiveUsers();
+  const stat = (v: number | undefined, label: string, accent?: boolean) => (
+    <div className="flex-1 rounded-xl border border-gray-200 bg-white py-2.5 text-center">
+      <div className={cn("text-lg font-bold", accent ? "text-green-600" : "text-gray-900")}>{v ?? "—"}</div>
+      <div className="text-[10px] text-gray-400">{label}</div>
+    </div>
+  );
+  return (
+    <div className="mb-4">
+      <div className="mb-1.5 flex items-center gap-1.5 text-[13px] font-medium text-gray-900">
+        <span className="h-2 w-2 animate-pulse rounded-full bg-green-500" /> Conectados
+      </div>
+      <div className="flex gap-2">
+        {stat(data?.now, "ahora (5 min)", true)}
+        {stat(data?.last_60m, "última hora")}
+        {stat(data?.today, "hoy")}
+        {stat(data?.total, "registrados")}
+      </div>
     </div>
   );
 }
@@ -769,6 +793,7 @@ export default function AdminPage() {
       </header>
 
       <main className="px-4 pb-24 pt-3">
+        <ActiveUsersCard />
         <ContactManager />
         <SettingsManager />
         <ResultsManager />

@@ -338,6 +338,28 @@ def live_sync(db: Session = Depends(get_db)):
     return promiedos.fetch_and_apply(db)
 
 
+@router.get("/active")
+def active_users(db: Session = Depends(get_db)):
+    """Users seen (via /auth/me heartbeat) within each window."""
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime.now(timezone.utc)
+
+    def seen_within(mins: int) -> int:
+        return (
+            db.query(func.count(User.id)).filter(User.last_seen >= now - timedelta(minutes=mins)).scalar()
+            or 0
+        )
+
+    return {
+        "now": seen_within(5),
+        "last_15m": seen_within(15),
+        "last_60m": seen_within(60),
+        "today": seen_within(60 * 24),
+        "total": db.query(func.count(User.id)).scalar() or 0,
+    }
+
+
 @router.get("/stats")
 def global_stats(db: Session = Depends(get_db)):
     return {

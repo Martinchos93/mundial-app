@@ -21,6 +21,7 @@ class User(Base):
 
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
 
     memberships: Mapped[list["Membership"]] = relationship(  # noqa: F821
         back_populates="user", cascade="all, delete-orphan"

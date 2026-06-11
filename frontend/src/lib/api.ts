@@ -864,9 +864,25 @@ export interface MeData {
 
 export function useMe() {
   const token = getToken();
-  return useSWR<MeData>(token ? "/auth/me" : null, (url: string) =>
-    http.get(url).then((r) => r.data as MeData),
+  return useSWR<MeData>(
+    token ? "/auth/me" : null,
+    (url: string) => http.get(url).then((r) => r.data as MeData),
+    { refreshInterval: 60000 }, // heartbeat for "active now" presence
   );
+}
+
+export interface ActiveUsers {
+  now: number;
+  last_15m: number;
+  last_60m: number;
+  today: number;
+  total: number;
+}
+
+export function useActiveUsers() {
+  return useSWR<ActiveUsers>("/admin/active", (url: string) => http.get(url).then((r) => r.data as ActiveUsers), {
+    refreshInterval: 30000,
+  });
 }
 
 // ---- News ----------------------------------------------------------------

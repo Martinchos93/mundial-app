@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -49,6 +51,9 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
 @router.get("/me", response_model=MeResponse)
 def me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Heartbeat: /auth/me is polled by the app, so use it to track presence.
+    current_user.last_seen = datetime.now(timezone.utc)
+    db.commit()
     memberships = []
     for m in current_user.memberships:
         g = m.group

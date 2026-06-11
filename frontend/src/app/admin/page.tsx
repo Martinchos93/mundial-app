@@ -16,6 +16,7 @@ import {
   createAdmin,
   revokeAdmin,
   makeAdmin,
+  resetUserPassword,
   useAdminUsers,
   useMatches,
   setMatchResult,
@@ -170,11 +171,31 @@ function UsersTable() {
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [busy, setBusy] = useState<number | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
   const { data, isLoading, mutate } = useAdminUsers(q, page, 10);
 
   useEffect(() => {
     setPage(1);
   }, [q]);
+
+  async function resetPassword(id: number, username: string) {
+    const pw = window.prompt(`Nueva contraseña para @${username} (mínimo 6 caracteres):`);
+    if (pw == null) return;
+    if (pw.trim().length < 6) {
+      setMsg("La contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+    setBusy(id);
+    setMsg(null);
+    try {
+      await resetUserPassword(id, pw.trim());
+      setMsg(`✅ Contraseña de @${username} actualizada.`);
+    } catch {
+      setMsg("No se pudo actualizar la contraseña.");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function toggleAdmin(id: number, isAdmin: boolean) {
     setBusy(id);
@@ -195,6 +216,7 @@ function UsersTable() {
         <div className="text-[13px] font-medium text-gray-900">Cuentas</div>
         <span className="text-[11px] text-gray-400">{total} en total</span>
       </div>
+      {msg && <p className="mb-2 rounded-lg bg-gray-50 px-2.5 py-1.5 text-[11px] text-gray-600">{msg}</p>}
       <div className="relative mb-3">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
         <input
@@ -242,6 +264,14 @@ function UsersTable() {
                     )}
                   >
                     {busy === u.id ? "…" : u.is_admin ? "Quitar admin" : "Hacer admin"}
+                  </button>
+                  <button
+                    onClick={() => resetPassword(u.id, u.username)}
+                    disabled={busy === u.id}
+                    title="Resetear contraseña"
+                    className="ml-1 rounded-lg border border-gray-200 px-2 py-1 text-[11px] text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    🔑
                   </button>
                 </td>
               </tr>

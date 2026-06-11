@@ -57,6 +57,21 @@ def create_admin(payload: AdminCreate, db: Session = Depends(get_db)):
     return UserOut.model_validate(u)
 
 
+class PasswordReset(BaseModel):
+    password: str = Field(..., min_length=6, max_length=128)
+
+
+@router.post("/users/{user_id}/reset-password")
+def reset_user_password(user_id: int, payload: PasswordReset, db: Session = Depends(get_db)):
+    """Set a registered user's password to a value chosen by the admin."""
+    u = db.get(User, user_id)
+    if u is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    u.password_hash = hash_password(payload.password)
+    db.commit()
+    return {"ok": True, "username": u.username}
+
+
 @router.post("/users/{user_id}/make-admin", response_model=UserOut)
 def make_admin(user_id: int, db: Session = Depends(get_db)):
     """Promote an existing registered user to admin."""

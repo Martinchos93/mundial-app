@@ -795,6 +795,11 @@ export async function makeAdmin(userId: number): Promise<void> {
   await http.post(`/admin/users/${userId}/make-admin`);
 }
 
+/** Admin sets a new password for a user. */
+export async function resetUserPassword(userId: number, password: string): Promise<void> {
+  await http.post(`/admin/users/${userId}/reset-password`, { password });
+}
+
 export interface CreateColumnBody {
   name: string;
   pts_result: number;

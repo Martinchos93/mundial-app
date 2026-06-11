@@ -205,12 +205,11 @@ def get_champion(
     )
     col = db.get(Column, column_id)
     cfg = (col.scoring_config if col else None) or {}
-    started = db.query(Match).filter(Match.status != "scheduled").first() is not None
     return ChampionOut(
         column_id=column_id,
         pick=pick.team_name if pick else None,
         champion=tournament_champion(db),
-        started=started,
+        started=is_topscorer_locked(db),  # editable until matchday 1 is played
         finished=is_tournament_finished(db),
         points_value=int(cfg.get("pts_champion", 15)),
     )
@@ -227,8 +226,11 @@ def set_champion(
         raise HTTPException(status_code=404, detail="Column not found")
     if not _active_member(db, current_user.id, list(column.group_ids or [])):
         raise HTTPException(status_code=403, detail="Tu ingreso al prode está pendiente de aprobación")
-    if db.query(Match).filter(Match.status != "scheduled").first() is not None:
-        raise HTTPException(status_code=400, detail="El campeón ya no se puede cambiar: el torneo comenzó")
+    if is_topscorer_locked(db):
+        raise HTTPException(
+            status_code=400,
+            detail="El campeón ya no se puede cambiar: se jugó la primera fecha",
+        )
 
     pick = (
         db.query(ChampionPrediction)
@@ -250,7 +252,7 @@ def set_champion(
         column_id=payload.column_id,
         pick=pick.team_name,
         champion=tournament_champion(db),
-        started=False,
+        started=is_topscorer_locked(db),
         finished=is_tournament_finished(db),
         points_value=int(cfg.get("pts_champion", 15)),
     )

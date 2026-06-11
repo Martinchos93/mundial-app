@@ -76,7 +76,10 @@ export default function ProdePage() {
   const findPred = (matchId: number) =>
     predictions?.find((p) => p.match_id === matchId && (columnId == null || p.column_id === columnId));
   const upcoming = (matches ?? []).filter((m) => m.status === "scheduled");
-  const resolved = (matches ?? []).filter((m) => m.status === "finished" && findPred(m.id));
+  // Matches already started (live or finished): always shown, predicted or not.
+  const played = (matches ?? [])
+    .filter((m) => m.status === "live" || m.status === "finished")
+    .sort((a, b) => Date.parse(a.kickoff_at) - Date.parse(b.kickoff_at));
 
   if (selected) {
     return (
@@ -133,15 +136,19 @@ export default function ProdePage() {
           ))}
         </div>
 
-        {resolved.length > 0 && (
+        {played.length > 0 && (
           <>
             <p className="mb-2 mt-5 text-[11px] font-medium uppercase tracking-wider text-gray-400">
-              Finalizados
+              En vivo y finalizados
             </p>
             <div className="space-y-2">
-              {resolved.map((m) => (
-                <PredictionForm key={m.id} match={m} existing={findPred(m.id)} />
-              ))}
+              {played.map((m) =>
+                findPred(m.id) ? (
+                  <PredictionForm key={m.id} match={m} existing={findPred(m.id)} />
+                ) : (
+                  <MatchCard key={m.id} match={m} />
+                ),
+              )}
             </div>
           </>
         )}

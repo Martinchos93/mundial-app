@@ -57,7 +57,7 @@ export default function ScoringLegend() {
             Ej.: si acertás el <b>resultado</b> y el <b>total de goles</b>, sumás 3 + 2 + <b>3 de bonus</b> = <b>8</b> en ese partido.
           </p>
           <p className="mt-2 text-[10.5px] text-gray-400">
-            🥇 El goleador del torneo se puede cambiar hasta el último partido de la 1ª fecha. 🏆 El campeón, hasta el comienzo del torneo.
+            🥇 El goleador y 🏆 el campeón del torneo se pueden cambiar hasta el último partido de la 1ª fecha.
           </p>
         </div>
       )}

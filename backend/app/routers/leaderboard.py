@@ -25,11 +25,18 @@ def _build_leaderboard(db: Session, group_id: int, only_today: bool) -> list[Lea
     if not users:
         return []
 
+    user_ids = [u.id for u in users]
+    # Only this prode's columns — otherwise a user in several prodes would have
+    # all their predictions summed into every prode's table.
+    col_ids = [c.id for c in db.query(Column).filter(Column.group_ids.any(group_id)).all()]
+    if not col_ids:
+        col_ids = [-1]  # no columns → nothing to sum
+
     q = (
         db.query(Prediction.user_id, func.coalesce(func.sum(Score.total), 0))
         .join(Score, Score.prediction_id == Prediction.id)
         .join(Match, Match.id == Prediction.match_id)
-        .filter(Prediction.user_id.in_([u.id for u in users]))
+        .filter(Prediction.user_id.in_(user_ids), Prediction.column_id.in_(col_ids))
         .group_by(Prediction.user_id)
     )
     if only_today:
@@ -42,8 +49,6 @@ def _build_leaderboard(db: Session, group_id: int, only_today: bool) -> list[Lea
     # Tournament-long bonuses (top scorer + champion), awarded once the final is
     # played. "Today" views exclude them — they're prizes, not daily deltas.
     if not only_today and is_tournament_finished(db):
-        user_ids = [u.id for u in users]
-        col_ids = [c.id for c in db.query(Column).filter(Column.group_ids.any(group_id)).all()]
 
         def _award(model, target: str | None, attr: str, cfg_key: str, default: int):
             if not target or not col_ids:
@@ -110,16 +115,24 @@ def breakdown(group_id: int, db: Session = Depends(get_db)):
     if not member_ids:
         return {"members": [], "matches": []}
 
+    # Scope to this prode's columns (a user may play several prodes).
+    col_ids = [c.id for c in db.query(Column).filter(Column.group_ids.any(group_id)).all()] or [-1]
+
     rows = (
         db.query(Prediction.user_id, Prediction.match_id, Score.total)
         .join(Score, Score.prediction_id == Prediction.id)
         .join(Match, Match.id == Prediction.match_id)
-        .filter(Prediction.user_id.in_(member_ids), Match.status == "finished")
+        .filter(
+            Prediction.user_id.in_(member_ids),
+            Prediction.column_id.in_(col_ids),
+            Match.status == "finished",
+        )
         .all()
     )
     points: dict[int, dict[int, int]] = {}
     for uid, mid, total in rows:
-        points.setdefault(mid, {})[uid] = int(total or 0)
+        slot = points.setdefault(mid, {})
+        slot[uid] = slot.get(uid, 0) + int(total or 0)
 
     matches = (
         db.query(Match).filter(Match.id.in_(points.keys())).order_by(Match.kickoff_utc.desc()).all()

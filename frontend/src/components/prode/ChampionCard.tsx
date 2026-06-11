@@ -40,7 +40,7 @@ export default function ChampionCard({ columnId }: { columnId: number | null }) 
       setQ("");
     } catch (e: unknown) {
       const status = (e as { response?: { status?: number } })?.response?.status;
-      setError(status === 400 ? "El torneo ya comenzó: no se puede cambiar." : "No se pudo guardar.");
+      setError(status === 400 ? "Se jugó la 1ª fecha: ya no se puede cambiar." : "No se pudo guardar.");
     } finally {
       setSaving(false);
     }
@@ -56,6 +56,11 @@ export default function ChampionCard({ columnId }: { columnId: number | null }) 
         <div>
           <h2 className="text-[13px] font-semibold text-gray-900">🏆 Campeón del torneo</h2>
           <p className="text-[11px] text-violet-700">Predicción inicial · acertás y sumás +{pointsValue} pts</p>
+          <p className="mt-0.5 text-[10.5px] text-violet-700/80">
+            {locked
+              ? "🔒 Cerrado: ya se jugó la 1ª fecha."
+              : "Podés cambiarlo hasta el último partido de la 1ª fecha."}
+          </p>
         </div>
         {!locked && (
           <button

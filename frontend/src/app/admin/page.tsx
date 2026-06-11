@@ -190,8 +190,13 @@ function UsersTable() {
     try {
       await resetUserPassword(id, pw.trim());
       setMsg(`✅ Contraseña de @${username} actualizada.`);
-    } catch {
-      setMsg("No se pudo actualizar la contraseña.");
+    } catch (e: unknown) {
+      const status = (e as { response?: { status?: number } })?.response?.status;
+      setMsg(
+        status === 404 || status === 405
+          ? "El servidor todavía no tiene esta función (esperá unos minutos al redeploy)."
+          : "No se pudo actualizar la contraseña.",
+      );
     } finally {
       setBusy(null);
     }
@@ -227,60 +232,58 @@ function UsersTable() {
         />
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-[12px]">
-          <thead>
-            <tr className="border-b border-gray-100 text-[10px] uppercase tracking-wider text-gray-400">
-              <th className="py-1.5 pr-2 font-medium">Usuario</th>
-              <th className="px-2 font-medium">Email</th>
-              <th className="px-2 text-center font-medium">Prodes</th>
-              <th className="px-2 text-center font-medium">Rol</th>
-              <th className="pl-2 text-right font-medium">Acción</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.items.map((u) => (
-              <tr key={u.id} className="border-b border-gray-50 last:border-0">
-                <td className="py-2 pr-2">
-                  <div className="font-medium text-gray-900">{u.first_name} {u.last_name}</div>
-                  <div className="text-[11px] text-gray-400">@{u.username}{u.age != null ? ` · ${u.age}` : ""}</div>
-                </td>
-                <td className="max-w-[160px] truncate px-2 text-gray-500">{u.email}</td>
-                <td className="px-2 text-center text-gray-600">{u.prodes}</td>
-                <td className="px-2 text-center">
-                  {u.is_admin
-                    ? <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">Admin</span>
-                    : <span className="text-[11px] text-gray-300">—</span>}
-                </td>
-                <td className="pl-2 text-right">
-                  <button
-                    onClick={() => toggleAdmin(u.id, u.is_admin)}
-                    disabled={busy === u.id}
-                    className={cn(
-                      "rounded-lg px-2 py-1 text-[11px] font-medium transition-colors disabled:opacity-50",
-                      u.is_admin
-                        ? "border border-gray-200 text-gray-500 hover:bg-gray-50"
-                        : "bg-blue-600 text-white hover:bg-blue-700",
-                    )}
-                  >
-                    {busy === u.id ? "…" : u.is_admin ? "Quitar admin" : "Hacer admin"}
-                  </button>
-                  <button
-                    onClick={() => resetPassword(u.id, u.username)}
-                    disabled={busy === u.id}
-                    title="Resetear contraseña"
-                    className="ml-1 rounded-lg border border-gray-200 px-2 py-1 text-[11px] text-gray-500 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    🔑
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {!isLoading && data?.items.length === 0 && (
-              <tr><td colSpan={5} className="py-6 text-center text-gray-400">Sin resultados.</td></tr>
-            )}
-          </tbody>
-        </table>
+      <div className="space-y-2">
+        {data?.items.map((u) => (
+          <div key={u.id} className="rounded-xl border border-gray-100 p-2.5">
+            <div className="flex items-start gap-2.5">
+              <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-gray-100 text-[12px] font-semibold text-gray-500">
+                {`${u.first_name?.[0] ?? ""}${u.last_name?.[0] ?? ""}`.toUpperCase() || "?"}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate text-[13px] font-semibold text-gray-900">
+                    {u.first_name} {u.last_name}
+                  </span>
+                  {u.is_admin && (
+                    <span className="flex-none rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">
+                      Admin
+                    </span>
+                  )}
+                </div>
+                <div className="truncate text-[11px] text-gray-400">
+                  @{u.username}
+                  {u.age != null ? ` · ${u.age} años` : ""}
+                </div>
+                <div className="truncate text-[11px] text-gray-400">{u.email}</div>
+                <div className="text-[11px] text-gray-400">🏆 {u.prodes} {u.prodes === 1 ? "prode" : "prodes"}</div>
+              </div>
+            </div>
+            <div className="mt-2 flex gap-1.5">
+              <button
+                onClick={() => toggleAdmin(u.id, u.is_admin)}
+                disabled={busy === u.id}
+                className={cn(
+                  "rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors disabled:opacity-50",
+                  u.is_admin
+                    ? "border border-gray-200 text-gray-500 hover:bg-gray-50"
+                    : "bg-blue-600 text-white hover:bg-blue-700",
+                )}
+              >
+                {busy === u.id ? "…" : u.is_admin ? "Quitar admin" : "Hacer admin"}
+              </button>
+              <button
+                onClick={() => resetPassword(u.id, u.username)}
+                disabled={busy === u.id}
+                className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-[11px] text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              >
+                🔑 Resetear clave
+              </button>
+            </div>
+          </div>
+        ))}
+        {!isLoading && data?.items.length === 0 && (
+          <p className="py-6 text-center text-[13px] text-gray-400">Sin resultados.</p>
+        )}
       </div>
 
       {totalPages > 1 && (

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { isToday, parseISO } from "date-fns";
-import { Bell } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { format } from "date-fns";
+import { Bell, ChevronDown } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import MatchCard from "@/components/match/MatchCard";
 import ProdeSwitcher from "@/components/prode/ProdeSwitcher";
@@ -10,37 +10,22 @@ import { useMatches, usePredictions, useNews, useGroupColumns } from "@/lib/api"
 import { cn, formatMatchDate, groupMatchesByDay, timezoneLabel, getSelectedGroupId, setSelectedGroupId } from "@/lib/utils";
 import type { Match } from "@/types";
 
-type Filter = "all" | "live" | "today" | "finished";
-
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: "all", label: "Todos" },
-  { key: "live", label: "En vivo" },
-  { key: "today", label: "Hoy" },
-  { key: "finished", label: "Finalizados" },
-];
-
 function CardSkeleton() {
   return <div className="h-28 animate-pulse rounded-xl border border-gray-200 bg-white" />;
 }
 
-function applyFilter(matches: Match[], filter: Filter): Match[] {
-  switch (filter) {
-    case "live":
-      return matches.filter((m) => m.status === "live");
-    case "today":
-      return matches.filter((m) => isToday(parseISO(m.kickoff_at)));
-    case "finished":
-      return matches.filter((m) => m.status === "finished");
-    default:
-      return matches;
-  }
+/** Round label for a day's matches (group stage vs a knockout round). */
+function phaseLabel(ms: Match[]): string {
+  const phases = ms.map((m) => m.phase || "");
+  if (phases.every((p) => p.startsWith("Grupo"))) return "Fase de grupos";
+  const distinct = Array.from(new Set(phases.filter(Boolean)));
+  return distinct.length === 1 ? distinct[0] : "Eliminación";
 }
 
 export default function FixturePage() {
   const { data, isLoading, error } = useMatches();
   const { data: predictions } = usePredictions();
   const { data: news } = useNews();
-  const [filter, setFilter] = useState<Filter>("all");
 
   // Which prode we're viewing (predictions are per-prode).
   const [groupId, setGroupId] = useState<number | null>(null);
@@ -59,12 +44,32 @@ export default function FixturePage() {
     setSelectedGroupId(id);
   }
 
-  const grouped = useMemo(() => {
-    if (!data) return new Map<string, Match[]>();
-    return groupMatchesByDay(applyFilter(data, filter));
-  }, [data, filter]);
+  const days = useMemo(() => {
+    if (!data) return [] as [string, Match[]][];
+    return Array.from(groupMatchesByDay(data).entries());
+  }, [data]);
 
-  // Only the selected prode's prediction for each match.
+  const todayKey = format(new Date(), "yyyy-MM-dd");
+  const focusKey = useMemo(() => {
+    const keys = days.map(([k]) => k);
+    if (keys.includes(todayKey)) return todayKey;
+    return keys.find((k) => k >= todayKey) ?? keys[keys.length - 1] ?? "";
+  }, [days, todayKey]);
+
+  // Accordion state: open the focused day + any day with a live match.
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const inited = useRef(false);
+  const focusRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (inited.current || days.length === 0) return;
+    inited.current = true;
+    const init: Record<string, boolean> = {};
+    if (focusKey) init[focusKey] = true;
+    for (const [k, ms] of days) if (ms.some((m) => m.status === "live")) init[k] = true;
+    setOpen(init);
+    setTimeout(() => focusRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }), 250);
+  }, [days, focusKey]);
+
   const findPred = (matchId: number) =>
     predictions?.find((p) => p.match_id === matchId && (columnId == null || p.column_id === columnId));
 
@@ -78,31 +83,13 @@ export default function FixturePage() {
         <Bell className="h-5 w-5 text-gray-400" />
       </header>
 
-      <ProdeSwitcher value={groupId} onChange={switchProde} className="border-b border-gray-100 bg-white px-4 pb-2.5" />
-
-      <div className="flex gap-2 border-b border-gray-100 bg-white px-4 pb-3">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            className={cn(
-              "whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
-              filter === f.key ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-500",
-            )}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
+      <ProdeSwitcher value={groupId} onChange={switchProde} className="border-b border-gray-100 bg-white px-4 py-2.5" />
 
       <main className="px-4 pb-24 pt-3">
         {news?.items && news.items.length > 0 && (
           <div className="mb-4 -mx-4 flex gap-2.5 overflow-x-auto px-4">
             {news.items.slice(0, 6).map((n) => (
-              <div
-                key={n.id}
-                className="w-56 flex-none overflow-hidden rounded-xl border border-gray-200 bg-white"
-              >
+              <div key={n.id} className="w-56 flex-none overflow-hidden rounded-xl border border-gray-200 bg-white">
                 {n.image_url && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={n.image_url} alt="" className="h-24 w-full object-cover" />
@@ -130,31 +117,56 @@ export default function FixturePage() {
           </p>
         )}
 
-        {!isLoading && !error && grouped.size === 0 && (
+        {!isLoading && !error && days.length === 0 && (
           <p className="py-10 text-center text-sm text-gray-400">No hay partidos para mostrar.</p>
         )}
 
-        <div className="space-y-5">
-          {Array.from(grouped.entries()).map(([day, matches]) => {
+        <div className="space-y-2.5">
+          {days.map(([day, matches]) => {
+            const isOpen = !!open[day];
             const hasLive = matches.some((m) => m.status === "live");
+            const finished = matches.filter((m) => m.status === "finished").length;
+            const isFocus = day === focusKey;
             return (
-              <section key={day}>
-                <div className="mb-2 flex items-center gap-1.5">
-                  <h2 className="text-sm font-medium text-gray-700">
-                    {formatMatchDate(matches[0].kickoff_at)}
-                  </h2>
-                  {hasLive && (
-                    <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-500">
-                      En vivo
-                    </span>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  {matches.map((m) => (
-                    <MatchCard key={m.id} match={m} prediction={findPred(m.id)} showPrediction />
-                  ))}
-                </div>
-              </section>
+              <div
+                key={day}
+                ref={isFocus ? focusRef : undefined}
+                className={cn(
+                  "scroll-mt-24 overflow-hidden rounded-xl border bg-white",
+                  isFocus ? "border-blue-300 ring-1 ring-blue-100" : "border-gray-200",
+                )}
+              >
+                <button
+                  onClick={() => setOpen((o) => ({ ...o, [day]: !o[day] }))}
+                  className="flex w-full items-center justify-between gap-2 px-3.5 py-3 text-left"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[14px] font-semibold capitalize text-gray-900">
+                        {formatMatchDate(matches[0].kickoff_at)}
+                      </span>
+                      {hasLive && (
+                        <span className="flex items-center gap-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-500">
+                          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" /> En vivo
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-gray-400">
+                      {phaseLabel(matches)} · {matches.length} {matches.length === 1 ? "partido" : "partidos"}
+                      {finished > 0 && ` · ${finished} finalizado${finished === 1 ? "" : "s"}`}
+                    </div>
+                  </div>
+                  <ChevronDown className={cn("h-4 w-4 flex-none text-gray-400 transition-transform", isOpen && "rotate-180")} />
+                </button>
+
+                {isOpen && (
+                  <div className="space-y-2 border-t border-gray-100 p-3">
+                    {matches.map((m) => (
+                      <MatchCard key={m.id} match={m} prediction={findPred(m.id)} showPrediction />
+                    ))}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>

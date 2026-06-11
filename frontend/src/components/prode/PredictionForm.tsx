@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Minus, Plus, Check, ChevronDown } from "lucide-react";
 import type { Match, Prediction, AIResult, PlayerEvent } from "@/types";
 import { cn, isLockExpired, getToken } from "@/lib/utils";
-import { submitPrediction, useSettings } from "@/lib/api";
+import { submitPrediction, useSettings, useMe } from "@/lib/api";
 import PlayerEventsTable, { type EventMap } from "@/components/prode/PlayerEventsTable";
 
 interface Props {
@@ -95,12 +95,15 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
   const token = getToken();
   const { data: settings } = useSettings();
   const aiEnabled = settings?.ai_enabled ?? false;
+  const { data: me } = useMe();
+  const prodeCount = (me?.memberships ?? []).filter((m) => m.status === "active").length;
 
   const [home, setHome] = useState(existing?.pred_home_score ?? 0);
   const [away, setAway] = useState(existing?.pred_away_score ?? 0);
   const [yellows, setYellows] = useState(existing?.pred_yellows ?? 0);
   const [reds, setReds] = useState(existing?.pred_reds ?? 0);
   const [events, setEvents] = useState<EventMap>(toEventMap(existing?.pred_players));
+  const [applyAll, setApplyAll] = useState(true);
   const [openTable, setOpenTable] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -202,6 +205,7 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
         pred_yellows: yellows,
         pred_reds: reds,
         pred_players: picks,
+        apply_to_all: prodeCount > 1 && applyAll,
       });
       setSaved(true);
       onSaved?.();
@@ -310,6 +314,21 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
 
       {aiEnabled && ai && <p className="mb-2.5 text-center text-[11px] text-gray-400">{ai}</p>}
       {error && <p className="mb-2.5 text-center text-xs text-red-500">{error}</p>}
+
+      {!locked && prodeCount > 1 && (
+        <label className="mb-2.5 flex cursor-pointer items-center gap-2 rounded-lg bg-gray-50 px-2.5 py-2">
+          <input
+            type="checkbox"
+            checked={applyAll}
+            onChange={(e) => setApplyAll(e.target.checked)}
+            className="h-4 w-4 accent-blue-600"
+          />
+          <span className="text-[12px] text-gray-600">
+            Aplicar a mis {prodeCount} prodes
+            {!applyAll && <span className="text-gray-400"> · solo este prode</span>}
+          </span>
+        </label>
+      )}
 
       {!locked && (
         <button

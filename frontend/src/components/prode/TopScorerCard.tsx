@@ -6,16 +6,20 @@ import {
   useTopScorer,
   submitTopScorer,
   searchPlayers,
+  useMe,
   type PlayerSearchResult,
 } from "@/lib/api";
 
 export default function TopScorerCard({ columnId }: { columnId: number | null }) {
   const { data, mutate } = useTopScorer(columnId);
+  const { data: me } = useMe();
+  const prodeCount = (me?.memberships ?? []).filter((m) => m.status === "active").length;
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [results, setResults] = useState<PlayerSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [applyAll, setApplyAll] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -45,7 +49,7 @@ export default function TopScorerCard({ columnId }: { columnId: number | null })
     setSaving(true);
     setError(null);
     try {
-      await submitTopScorer(columnId!, p.name, p.team);
+      await submitTopScorer(columnId!, p.name, p.team, prodeCount > 1 && applyAll);
       await mutate();
       setOpen(false);
       setQ("");
@@ -107,6 +111,14 @@ export default function TopScorerCard({ columnId }: { columnId: number | null })
 
       {open && !locked && (
         <div className="mt-3 rounded-lg border border-amber-200 bg-white p-2">
+          {prodeCount > 1 && (
+            <label className="mb-2 flex cursor-pointer items-center gap-2 px-1">
+              <input type="checkbox" checked={applyAll} onChange={(e) => setApplyAll(e.target.checked)} className="h-4 w-4 accent-amber-600" />
+              <span className="text-[12px] text-gray-600">
+                Aplicar a mis {prodeCount} prodes{!applyAll && <span className="text-gray-400"> · solo este</span>}
+              </span>
+            </label>
+          )}
           <div className="flex items-center gap-2 rounded-md bg-gray-50 px-2">
             <Search className="h-3.5 w-3.5 text-gray-400" />
             <input

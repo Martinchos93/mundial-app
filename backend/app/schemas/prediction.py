@@ -20,6 +20,8 @@ class PredictionCreate(BaseModel):
     pred_reds: int = Field(default=0, ge=0, le=20)
     # Per-player picks with counts (goals / yellow / red). Capped server-side.
     pred_players: list[PlayerEvent] = Field(default_factory=list, max_length=40)
+    # Copy this prediction to all the user's active prodes (default: only this one).
+    apply_to_all: bool = False
 
 
 class ScoreOut(BaseModel):
@@ -74,6 +76,7 @@ class TopScorerCreate(BaseModel):
     column_id: int
     player_name: str = Field(..., min_length=1, max_length=120)
     team_name: str | None = None
+    apply_to_all: bool = False
 
 
 class TopScorerOut(BaseModel):
@@ -89,6 +92,7 @@ class TopScorerOut(BaseModel):
 class ChampionCreate(BaseModel):
     column_id: int
     team_name: str = Field(..., min_length=1, max_length=120)
+    apply_to_all: bool = False
 
 
 class ChampionOut(BaseModel):

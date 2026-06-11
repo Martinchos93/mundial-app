@@ -573,6 +573,7 @@ export interface SubmitPredictionBody {
   pred_yellows: number;
   pred_reds: number;
   pred_players?: PlayerEvent[];
+  apply_to_all?: boolean;
 }
 
 export async function submitPrediction(body: SubmitPredictionBody): Promise<Prediction> {
@@ -603,11 +604,13 @@ export async function submitTopScorer(
   columnId: number,
   playerName: string,
   teamName?: string | null,
+  applyToAll = false,
 ): Promise<TopScorerState> {
   const res = await http.post(`/predictions/top-scorer`, {
     column_id: columnId,
     player_name: playerName,
     team_name: teamName ?? null,
+    apply_to_all: applyToAll,
   });
   return res.data as TopScorerState;
 }
@@ -630,8 +633,16 @@ export function useChampion(columnId: number | null) {
   );
 }
 
-export async function submitChampion(columnId: number, teamName: string): Promise<ChampionState> {
-  const res = await http.post(`/predictions/champion`, { column_id: columnId, team_name: teamName });
+export async function submitChampion(
+  columnId: number,
+  teamName: string,
+  applyToAll = false,
+): Promise<ChampionState> {
+  const res = await http.post(`/predictions/champion`, {
+    column_id: columnId,
+    team_name: teamName,
+    apply_to_all: applyToAll,
+  });
   return res.data as ChampionState;
 }
 

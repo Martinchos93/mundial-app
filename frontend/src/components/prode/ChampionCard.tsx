@@ -2,14 +2,17 @@
 
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
-import { useChampion, submitChampion, useStandings } from "@/lib/api";
+import { useChampion, submitChampion, useStandings, useMe } from "@/lib/api";
 
 export default function ChampionCard({ columnId }: { columnId: number | null }) {
   const { data, mutate } = useChampion(columnId);
   const { data: teams } = useStandings();
+  const { data: me } = useMe();
+  const prodeCount = (me?.memberships ?? []).filter((m) => m.status === "active").length;
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [saving, setSaving] = useState(false);
+  const [applyAll, setApplyAll] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const options = useMemo(() => {
@@ -34,7 +37,7 @@ export default function ChampionCard({ columnId }: { columnId: number | null }) 
     setSaving(true);
     setError(null);
     try {
-      await submitChampion(columnId!, name);
+      await submitChampion(columnId!, name, prodeCount > 1 && applyAll);
       await mutate();
       setOpen(false);
       setQ("");
@@ -91,6 +94,14 @@ export default function ChampionCard({ columnId }: { columnId: number | null }) 
 
       {open && !locked && (
         <div className="mt-3 rounded-lg border border-violet-200 bg-white p-2">
+          {prodeCount > 1 && (
+            <label className="mb-2 flex cursor-pointer items-center gap-2 px-1">
+              <input type="checkbox" checked={applyAll} onChange={(e) => setApplyAll(e.target.checked)} className="h-4 w-4 accent-violet-600" />
+              <span className="text-[12px] text-gray-600">
+                Aplicar a mis {prodeCount} prodes{!applyAll && <span className="text-gray-400"> · solo este</span>}
+              </span>
+            </label>
+          )}
           <div className="flex items-center gap-2 rounded-md bg-gray-50 px-2">
             <Search className="h-3.5 w-3.5 text-gray-400" />
             <input

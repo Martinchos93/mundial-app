@@ -56,6 +56,52 @@ def my_predictions(
     return [PredictionOut.model_validate(p) for p in preds]
 
 
+def _apply_pred(db: Session, user_id: int, match_id: int, column_id: int, payload: PredictionCreate):
+    """Get-or-create the prediction for (user, match, column) and set its fields.
+    Returns None if the existing prediction is already locked (scored)."""
+    pred = (
+        db.query(Prediction)
+        .filter(
+            Prediction.user_id == user_id,
+            Prediction.match_id == match_id,
+            Prediction.column_id == column_id,
+        )
+        .one_or_none()
+    )
+    if pred is None:
+        pred = Prediction(user_id=user_id, match_id=match_id, column_id=column_id)
+        db.add(pred)
+    elif pred.locked:
+        return None
+
+    pred.pred_home_score = payload.pred_home_score
+    pred.pred_away_score = payload.pred_away_score
+    pred.pred_yellows = payload.pred_yellows
+    pred.pred_reds = payload.pred_reds
+    players = [p for p in payload.pred_players if (p.g or p.y or p.r)]
+    pred.pred_players = [p.model_dump() for p in players] or None
+    pred.pred_scorers = [p.name for p in players if p.g] or None
+    pred.pred_cards = [p.name for p in players if (p.y or p.r)] or None
+    return pred
+
+
+def _user_active_columns(db: Session, user_id: int):
+    """Open columns belonging to the prodes where the user is an active member."""
+    gids = [
+        m.group_id
+        for m in db.query(Membership).filter(
+            Membership.user_id == user_id, Membership.status == "active"
+        )
+    ]
+    if not gids:
+        return []
+    return (
+        db.query(Column)
+        .filter(Column.status != "closed", Column.group_ids.overlap(gids))
+        .all()
+    )
+
+
 @router.post("", response_model=PredictionOut)
 def upsert_prediction(
     payload: PredictionCreate,
@@ -65,51 +111,34 @@ def upsert_prediction(
     match = db.get(Match, payload.match_id)
     if match is None:
         raise HTTPException(status_code=404, detail="Match not found")
+    if _is_locked(match):
+        raise HTTPException(status_code=400, detail="Predictions are locked for this match")
 
+    # Validate the requested prode strictly (this is the one the UI is showing).
     column = db.get(Column, payload.column_id)
     if column is None:
         raise HTTPException(status_code=404, detail="Column not found")
     if column.status == "closed":
         raise HTTPException(status_code=400, detail="Column is closed")
-
     if not _active_member(db, current_user.id, list(column.group_ids or [])):
         raise HTTPException(status_code=403, detail="Tu ingreso al prode está pendiente de aprobación")
 
-    if _is_locked(match):
-        raise HTTPException(status_code=400, detail="Predictions are locked for this match")
-
-    pred = (
-        db.query(Prediction)
-        .filter(
-            Prediction.user_id == current_user.id,
-            Prediction.match_id == payload.match_id,
-            Prediction.column_id == payload.column_id,
-        )
-        .one_or_none()
-    )
-    if pred is None:
-        pred = Prediction(
-            user_id=current_user.id,
-            match_id=payload.match_id,
-            column_id=payload.column_id,
-        )
-        db.add(pred)
-    elif pred.locked:
+    result = _apply_pred(db, current_user.id, payload.match_id, payload.column_id, payload)
+    if result is None:
         raise HTTPException(status_code=400, detail="Prediction is locked")
 
-    pred.pred_home_score = payload.pred_home_score
-    pred.pred_away_score = payload.pred_away_score
-    pred.pred_yellows = payload.pred_yellows
-    pred.pred_reds = payload.pred_reds
-    # Per-player picks: keep only rows that carry a goal/card.
-    players = [p for p in payload.pred_players if (p.g or p.y or p.r)]
-    pred.pred_players = [p.model_dump() for p in players] or None
-    # Derive legacy name lists for display / back-compat.
-    pred.pred_scorers = [p.name for p in players if p.g] or None
-    pred.pred_cards = [p.name for p in players if (p.y or p.r)] or None
+    # Copy to the user's other active prodes (lenient: skip closed / not-member).
+    if payload.apply_to_all:
+        for col in _user_active_columns(db, current_user.id):
+            if col.id == payload.column_id:
+                continue
+            if not _active_member(db, current_user.id, list(col.group_ids or [])):
+                continue
+            _apply_pred(db, current_user.id, payload.match_id, col.id, payload)
+
     db.commit()
-    db.refresh(pred)
-    return PredictionOut.model_validate(pred)
+    db.refresh(result)
+    return PredictionOut.model_validate(result)
 
 
 # ---- Prode al goleador (tournament top scorer) -------------------------
@@ -159,19 +188,33 @@ def set_top_scorer(
             detail="El goleador ya no se puede cambiar: se jugó la primera fecha",
         )
 
-    pick = (
-        db.query(TopScorerPrediction)
-        .filter(
-            TopScorerPrediction.user_id == current_user.id,
-            TopScorerPrediction.column_id == payload.column_id,
+    name = payload.player_name.strip()
+    team = (payload.team_name or "").strip() or None
+
+    def _set(column_id: int):
+        p = (
+            db.query(TopScorerPrediction)
+            .filter(
+                TopScorerPrediction.user_id == current_user.id,
+                TopScorerPrediction.column_id == column_id,
+            )
+            .one_or_none()
         )
-        .one_or_none()
-    )
-    if pick is None:
-        pick = TopScorerPrediction(user_id=current_user.id, column_id=payload.column_id)
-        db.add(pick)
-    pick.player_name = payload.player_name.strip()
-    pick.team_name = (payload.team_name or "").strip() or None
+        if p is None:
+            p = TopScorerPrediction(user_id=current_user.id, column_id=column_id)
+            db.add(p)
+        p.player_name = name
+        p.team_name = team
+        return p
+
+    pick = _set(payload.column_id)
+    if payload.apply_to_all:
+        for col in _user_active_columns(db, current_user.id):
+            if col.id == payload.column_id:
+                continue
+            if not _active_member(db, current_user.id, list(col.group_ids or [])):
+                continue
+            _set(col.id)
     db.commit()
 
     col = db.get(Column, payload.column_id)
@@ -232,18 +275,31 @@ def set_champion(
             detail="El campeón ya no se puede cambiar: se jugó la primera fecha",
         )
 
-    pick = (
-        db.query(ChampionPrediction)
-        .filter(
-            ChampionPrediction.user_id == current_user.id,
-            ChampionPrediction.column_id == payload.column_id,
+    team = payload.team_name.strip()
+
+    def _set(column_id: int):
+        p = (
+            db.query(ChampionPrediction)
+            .filter(
+                ChampionPrediction.user_id == current_user.id,
+                ChampionPrediction.column_id == column_id,
+            )
+            .one_or_none()
         )
-        .one_or_none()
-    )
-    if pick is None:
-        pick = ChampionPrediction(user_id=current_user.id, column_id=payload.column_id)
-        db.add(pick)
-    pick.team_name = payload.team_name.strip()
+        if p is None:
+            p = ChampionPrediction(user_id=current_user.id, column_id=column_id)
+            db.add(p)
+        p.team_name = team
+        return p
+
+    pick = _set(payload.column_id)
+    if payload.apply_to_all:
+        for col in _user_active_columns(db, current_user.id):
+            if col.id == payload.column_id:
+                continue
+            if not _active_member(db, current_user.id, list(col.group_ids or [])):
+                continue
+            _set(col.id)
     db.commit()
 
     col = db.get(Column, payload.column_id)

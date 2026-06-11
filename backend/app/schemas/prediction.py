@@ -81,6 +81,7 @@ class TopScorerOut(BaseModel):
     pick: str | None = None  # the current user's pick
     team_name: str | None = None
     leader: dict | None = None  # {name, goals} current tournament leader
+    locked: bool = False  # matchday 1 played → can't change the pick anymore
     finished: bool = False  # whether the tournament is over (points awarded)
     points_value: int = 10
 

@@ -587,6 +587,7 @@ export interface TopScorerState {
   pick: string | null;
   team_name: string | null;
   leader: { name: string; goals: number } | null;
+  locked: boolean;
   finished: boolean;
   points_value: number;
 }

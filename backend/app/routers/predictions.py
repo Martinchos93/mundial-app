@@ -16,7 +16,12 @@ from app.schemas.prediction import (
     ChampionCreate,
     ChampionOut,
 )
-from app.services.bracket import tournament_top_scorer, tournament_champion, is_tournament_finished
+from app.services.bracket import (
+    tournament_top_scorer,
+    tournament_champion,
+    is_tournament_finished,
+    is_topscorer_locked,
+)
 
 
 def _active_member(db: Session, user_id: int, group_ids: list[int]) -> bool:
@@ -130,6 +135,7 @@ def get_top_scorer(
         pick=pick.player_name if pick else None,
         team_name=pick.team_name if pick else None,
         leader=tournament_top_scorer(db),
+        locked=is_topscorer_locked(db),
         finished=is_tournament_finished(db),
         points_value=int(cfg.get("pts_top_scorer", 10)),
     )
@@ -146,9 +152,12 @@ def set_top_scorer(
         raise HTTPException(status_code=404, detail="Column not found")
     if not _active_member(db, current_user.id, list(column.group_ids or [])):
         raise HTTPException(status_code=403, detail="Tu ingreso al prode está pendiente de aprobación")
-    # Lock the top-scorer pick once the tournament has kicked off.
-    if db.query(Match).filter(Match.status != "scheduled").first() is not None:
-        raise HTTPException(status_code=400, detail="El goleador ya no se puede cambiar: el torneo comenzó")
+    # The top-scorer pick can be changed until matchday 1 has been played.
+    if is_topscorer_locked(db):
+        raise HTTPException(
+            status_code=400,
+            detail="El goleador ya no se puede cambiar: se jugó la primera fecha",
+        )
 
     pick = (
         db.query(TopScorerPrediction)
@@ -172,6 +181,7 @@ def set_top_scorer(
         pick=pick.player_name,
         team_name=pick.team_name,
         leader=tournament_top_scorer(db),
+        locked=is_topscorer_locked(db),
         finished=is_tournament_finished(db),
         points_value=int(cfg.get("pts_top_scorer", 10)),
     )

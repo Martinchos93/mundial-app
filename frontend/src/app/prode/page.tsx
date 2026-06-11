@@ -9,6 +9,7 @@ import PredictionForm from "@/components/prode/PredictionForm";
 import TopScorerCard from "@/components/prode/TopScorerCard";
 import ChampionCard from "@/components/prode/ChampionCard";
 import GroupLeaderboardCard from "@/components/prode/GroupLeaderboardCard";
+import ScoringLegend from "@/components/prode/ScoringLegend";
 import ProdeSwitcher from "@/components/prode/ProdeSwitcher";
 import { useMatches, usePredictions, useGroupColumns, useMe } from "@/lib/api";
 import { getToken, getSelectedGroupId, setSelectedGroupId, getUserId } from "@/lib/utils";
@@ -116,6 +117,7 @@ export default function ProdePage() {
 
       <main className="px-4 pb-24 pt-3">
         {groupId && <GroupLeaderboardCard groupId={Number(groupId)} userId={Number(getUserId()) || 0} />}
+        <ScoringLegend />
         <ChampionCard columnId={columnId} />
         <TopScorerCard columnId={columnId} />
 

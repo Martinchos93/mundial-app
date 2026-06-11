@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import random
 
-from collections import Counter
+from collections import Counter, defaultdict
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -286,6 +287,28 @@ def tournament_top_scorer(db: Session) -> dict | None:
 def is_tournament_finished(db: Session) -> bool:
     final = db.query(Match).filter(Match.match_no == 104).one_or_none()
     return bool(final and final.status == "finished")
+
+
+def matchday1_deadline(db: Session) -> datetime | None:
+    """Kickoff of the LAST matchday-1 group game (each group's 2nd-earliest)."""
+    by_group: dict[str, list[datetime]] = defaultdict(list)
+    for m in db.query(Match).filter(Match.phase.ilike("Grupo %")).all():
+        if m.kickoff_utc:
+            by_group[m.phase].append(m.kickoff_utc)
+    deadline: datetime | None = None
+    for kicks in by_group.values():
+        kicks.sort()
+        if len(kicks) >= 2:  # the 2nd game = last of matchday 1 for that group
+            md1_last = kicks[1]
+            if deadline is None or md1_last > deadline:
+                deadline = md1_last
+    return deadline
+
+
+def is_topscorer_locked(db: Session) -> bool:
+    """Top-scorer pick locks once matchday 1 has fully kicked off."""
+    d = matchday1_deadline(db)
+    return bool(d and datetime.now(timezone.utc) >= d)
 
 
 def tournament_champion(db: Session) -> str | None:

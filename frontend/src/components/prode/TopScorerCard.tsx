@@ -38,7 +38,7 @@ export default function TopScorerCard({ columnId }: { columnId: number | null })
 
   if (!columnId) return null;
 
-  const locked = !!data?.leader; // tournament underway → pick is frozen
+  const locked = !!data?.locked; // matchday 1 played → pick is frozen
   const pointsValue = data?.points_value ?? 10;
 
   async function pick(p: PlayerSearchResult) {
@@ -51,7 +51,7 @@ export default function TopScorerCard({ columnId }: { columnId: number | null })
       setQ("");
     } catch (e: unknown) {
       const status = (e as { response?: { status?: number } })?.response?.status;
-      setError(status === 400 ? "El torneo ya comenzó: no se puede cambiar." : "No se pudo guardar.");
+      setError(status === 400 ? "Se jugó la 1ª fecha: ya no se puede cambiar." : "No se pudo guardar.");
     } finally {
       setSaving(false);
     }
@@ -73,6 +73,12 @@ export default function TopScorerCard({ columnId }: { columnId: number | null })
           </button>
         )}
       </div>
+
+      <p className="mt-1 text-[10.5px] text-amber-700/80">
+        {locked
+          ? "🔒 Cerrado: ya se jugó la 1ª fecha."
+          : "Podés cambiarlo hasta el último partido de la 1ª fecha."}
+      </p>
 
       <div className="mt-2 flex items-center gap-2 text-[13px]">
         {data?.pick ? (

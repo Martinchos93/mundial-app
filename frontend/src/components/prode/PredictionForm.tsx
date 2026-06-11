@@ -291,7 +291,7 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
           {openTable && (
             <div className="mt-2">
               <p className="mb-1.5 text-[10px] text-gray-400">
-                Goles +3 c/u · amarilla +2 · roja +4. Hasta <span className="font-medium">5 jugadores</span> por categoría.
+                Goles +3 c/u · amarilla +2 · roja +4. Hasta <span className="font-medium">5 goleadores, 3 amarillas y 3 rojas</span>.
               </p>
               <PlayerEventsTable
                 homeTeam={homeTeamName}
@@ -299,7 +299,9 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
                 value={events}
                 onChange={setEvents}
                 disabled={locked}
-                maxPicks={5}
+                maxGoalPicks={5}
+                maxYellowPicks={3}
+                maxRedPicks={3}
               />
             </div>
           )}

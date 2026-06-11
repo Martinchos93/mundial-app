@@ -244,6 +244,20 @@ def test_pred_players_goal_picks_capped_at_five():
     assert b.pts_scorers == 5 * 3  # only first 5 picks count
 
 
+def test_pred_players_yellow_picks_capped_at_three():
+    picks = [{"name": n, "y": 1} for n in ["a", "b", "c", "d", "e"]]  # 5 yellow picks
+    booked = ["a", "b", "c", "d", "e"]  # all booked (yellow)
+    b = score(pred_players=picks, actual_booked=booked, actual_reds_players=[])
+    assert b.pts_cards == 3 * 2  # only first 3 yellow picks count
+
+
+def test_pred_players_red_picks_capped_at_three():
+    picks = [{"name": n, "r": 1} for n in ["a", "b", "c", "d"]]  # 4 red picks
+    reds = ["a", "b", "c", "d"]
+    b = score(pred_players=picks, actual_booked=reds, actual_reds_players=reds)
+    assert b.pts_cards == 3 * 4  # only first 3 red picks count
+
+
 def test_scorers_per_hit():
     # 2 picks, 1 of them actually scored -> +3 (one hit). Result also wrong.
     b = score(

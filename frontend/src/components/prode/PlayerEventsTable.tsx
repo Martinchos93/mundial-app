@@ -14,8 +14,10 @@ interface Props {
   onChange: (next: EventMap) => void;
   disabled?: boolean;
   maxGoals?: number;
-  /** Max players that can carry a goal / a card (anti-gaming). Infinity = no cap. */
-  maxPicks?: number;
+  /** Max players that can carry a goal / a yellow / a red (anti-gaming). Infinity = no cap. */
+  maxGoalPicks?: number;
+  maxYellowPicks?: number;
+  maxRedPicks?: number;
 }
 
 function MiniStepper({
@@ -71,14 +73,17 @@ export default function PlayerEventsTable({
   onChange,
   disabled,
   maxGoals = 5,
-  maxPicks = Infinity,
+  maxGoalPicks = Infinity,
+  maxYellowPicks = Infinity,
+  maxRedPicks = Infinity,
 }: Props) {
   const { data: home } = useSquad(homeTeam || null);
   const { data: away } = useSquad(awayTeam || null);
 
-  const capped = Number.isFinite(maxPicks);
+  const capped = [maxGoalPicks, maxYellowPicks, maxRedPicks].some((n) => Number.isFinite(n));
   const goalUsed = Object.values(value).filter((e) => (e.g ?? 0) > 0).length;
-  const cardUsed = Object.values(value).filter((e) => (e.y ?? 0) > 0 || (e.r ?? 0) > 0).length;
+  const yellowUsed = Object.values(value).filter((e) => (e.y ?? 0) > 0).length;
+  const redUsed = Object.values(value).filter((e) => (e.r ?? 0) > 0).length;
 
   function setField(p: SquadPlayer, team: string, field: "g" | "y" | "r", v: number) {
     const cur = value[p.name] ?? { name: p.name, team, g: 0, y: 0, r: 0 };
@@ -105,8 +110,9 @@ export default function PlayerEventsTable({
         const y = ev?.y ?? 0;
         const r = ev?.r ?? 0;
         const touched = g || y || r;
-        const goalAtCap = capped && g === 0 && goalUsed >= maxPicks;
-        const cardAtCap = capped && y === 0 && r === 0 && cardUsed >= maxPicks;
+        const goalAtCap = g === 0 && goalUsed >= maxGoalPicks;
+        const yellowAtCap = y === 0 && yellowUsed >= maxYellowPicks;
+        const redAtCap = r === 0 && redUsed >= maxRedPicks;
         return (
           <tr key={p.id} className={cn("border-t border-gray-50", touched && "bg-blue-50/30")}>
             <td className="px-2.5 py-1.5">
@@ -119,10 +125,10 @@ export default function PlayerEventsTable({
               <MiniStepper tone="goal" max={maxGoals} disabled={disabled} disablePlus={goalAtCap} value={g} onChange={(v) => setField(p, team, "g", v)} />
             </td>
             <td className="px-1 py-1.5">
-              <MiniStepper tone="yellow" max={1} disabled={disabled} disablePlus={cardAtCap} value={y} onChange={(v) => setField(p, team, "y", v)} />
+              <MiniStepper tone="yellow" max={1} disabled={disabled} disablePlus={yellowAtCap} value={y} onChange={(v) => setField(p, team, "y", v)} />
             </td>
             <td className="px-1 py-1.5">
-              <MiniStepper tone="red" max={1} disabled={disabled} disablePlus={cardAtCap} value={r} onChange={(v) => setField(p, team, "r", v)} />
+              <MiniStepper tone="red" max={1} disabled={disabled} disablePlus={redAtCap} value={r} onChange={(v) => setField(p, team, "r", v)} />
             </td>
           </tr>
         );
@@ -134,8 +140,9 @@ export default function PlayerEventsTable({
     <div>
       {capped && (
         <div className="mb-1 flex items-center justify-end gap-2 text-[10px] text-gray-400">
-          <span className={cn(goalUsed >= maxPicks && "font-semibold text-blue-600")}>⚽ {goalUsed}/{maxPicks}</span>
-          <span className={cn(cardUsed >= maxPicks && "font-semibold text-amber-600")}>🟨🟥 {cardUsed}/{maxPicks}</span>
+          <span className={cn(goalUsed >= maxGoalPicks && "font-semibold text-blue-600")}>⚽ {goalUsed}/{maxGoalPicks}</span>
+          <span className={cn(yellowUsed >= maxYellowPicks && "font-semibold text-amber-500")}>🟨 {yellowUsed}/{maxYellowPicks}</span>
+          <span className={cn(redUsed >= maxRedPicks && "font-semibold text-red-500")}>🟥 {redUsed}/{maxRedPicks}</span>
         </div>
       )}
       <div className="max-h-72 overflow-y-auto rounded-lg border border-gray-100">

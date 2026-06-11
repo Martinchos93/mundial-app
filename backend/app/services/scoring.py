@@ -29,9 +29,12 @@ DEFAULT_CONFIG: dict[str, int] = {
     "pts_champion": 15,
 }
 
-# Anti-gaming cap: a user can pick at most this many players per category per
-# match (otherwise filling the whole squad would guarantee every hit).
-MAX_PICKS = 5
+# Anti-gaming caps: at most this many players per category per match (otherwise
+# filling the whole squad would guarantee every hit).
+MAX_PICKS = 5  # legacy name-list fallback
+MAX_GOAL_PICKS = 5
+MAX_YELLOW_PICKS = 3
+MAX_RED_PICKS = 3
 
 
 @dataclass
@@ -87,14 +90,15 @@ def _score_players(
 
     Goals: +pts_scorer per correctly predicted goal, min(pred, actual) per player.
     Cards: yellow pick that landed +pts_card; red pick that landed +pts_card_red.
-    Only the first MAX_PICKS players (per category) count, to limit gaming.
+    Caps per match: up to MAX_GOAL_PICKS goal picks, MAX_YELLOW_PICKS yellow
+    picks and MAX_RED_PICKS red picks count, to limit gaming.
     """
     goals_actual = _counter(actual_scorers)
     red_set = {_norm(n) for n in (actual_reds or [])}
     yellow_set = {_norm(n) for n in (actual_booked or [])} - red_set
 
     goal_pts = card_pts = 0
-    goal_used = card_used = 0
+    goal_used = yellow_used = red_used = 0
     for p in pred_players or []:
         name = _norm(p.get("name", ""))
         if not name:
@@ -103,15 +107,18 @@ def _score_players(
         y = int(p.get("y", 0) or 0)
         r = int(p.get("r", 0) or 0)
 
-        if g > 0 and goal_used < MAX_PICKS:
+        if g > 0 and goal_used < MAX_GOAL_PICKS:
             goal_used += 1
             goal_pts += min(g, goals_actual.get(name, 0)) * int(cfg["pts_scorer"])
 
-        if (y > 0 or r > 0) and card_used < MAX_PICKS:
-            card_used += 1
-            if r > 0 and name in red_set:
+        if r > 0 and red_used < MAX_RED_PICKS:
+            red_used += 1
+            if name in red_set:
                 card_pts += int(cfg["pts_card_red"])
-            elif y > 0 and name in yellow_set:
+
+        if y > 0 and yellow_used < MAX_YELLOW_PICKS:
+            yellow_used += 1
+            if name in yellow_set:
                 card_pts += int(cfg["pts_card"])
     return goal_pts, card_pts
 

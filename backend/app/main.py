@@ -99,6 +99,7 @@ async def lifespan(app: FastAPI):
     except Exception:  # noqa: BLE001
         logger.exception("Initial fixture load failed (continuing)")
     _seed_fixture_if_empty()
+    _sync_kickoffs()
     _ensure_group_integrity()
     _bootstrap_admin()
     _load_squads()
@@ -124,6 +125,19 @@ def _seed_fixture_if_empty() -> None:
         logger.exception("Fixture auto-seed failed")
     finally:
         db.close()
+
+
+def _sync_kickoffs() -> None:
+    """Correct group-match kickoff times in place (no data wiped) so existing
+    deployments pick up schedule fixes."""
+    try:
+        from app.seed_2026 import sync_kickoffs
+
+        n = sync_kickoffs()
+        if n:
+            logger.info("Corrected kickoff times for %d matches", n)
+    except Exception:  # noqa: BLE001
+        logger.exception("Kickoff sync failed")
 
 
 def _load_squads() -> None:

@@ -638,6 +638,12 @@ export async function submitChampion(columnId: number, teamName: string): Promis
 
 export interface AppSettings {
   ai_enabled: boolean;
+  live_scraping_enabled: boolean;
+}
+
+export async function liveSyncNow(): Promise<{ enabled: boolean; updated?: number; games?: number }> {
+  const res = await http.post(`/admin/live/sync`);
+  return res.data;
 }
 
 export function useSettings() {

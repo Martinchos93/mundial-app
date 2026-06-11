@@ -11,7 +11,6 @@ import {
   updateNews,
   deleteNews,
   simulateTournament,
-  resetTournament,
   syncSquads,
   useAdmins,
   createAdmin,
@@ -24,6 +23,7 @@ import {
   uploadMedia,
   useSettings,
   setSetting,
+  liveSyncNow,
   useContactMessages,
   toggleContactHandled,
   markAllContactRead,
@@ -100,7 +100,7 @@ function AdminsManager() {
 }
 
 function TournamentTools() {
-  const [busy, setBusy] = useState<"sim" | "reset" | "squads" | null>(null);
+  const [busy, setBusy] = useState<"sim" | "squads" | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
   async function squads() {
@@ -131,24 +131,12 @@ function TournamentTools() {
       setBusy(null);
     }
   }
-  async function reset() {
-    setBusy("reset");
-    setMsg(null);
-    try {
-      await resetTournament();
-      setMsg("Fixture reiniciado a programado. Predicciones abiertas otra vez.");
-    } catch {
-      setMsg("No se pudo reiniciar.");
-    } finally {
-      setBusy(null);
-    }
-  }
-
   return (
     <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3.5">
       <div className="text-[13px] font-medium text-gray-900">Herramientas del torneo</div>
       <p className="mt-0.5 text-[11px] text-gray-400">
-        Simulá resultados para ver las tablas y el cuadro de cruces completarse.
+        Simulá resultados para probar las tablas y el cuadro. El botón “Reiniciar” está deshabilitado
+        para no borrar resultados ni pronósticos.
       </p>
       <div className="mt-3 flex gap-2">
         <button
@@ -159,11 +147,11 @@ function TournamentTools() {
           {busy === "sim" ? "Simulando..." : "⚡ Simular Mundial"}
         </button>
         <button
-          onClick={reset}
-          disabled={busy !== null}
-          className="flex-1 rounded-lg border border-gray-200 bg-white py-2 text-[13px] text-gray-600 hover:bg-gray-50 disabled:opacity-60"
+          disabled
+          title="Deshabilitado para no borrar resultados ni pronósticos"
+          className="flex-1 cursor-not-allowed rounded-lg border border-gray-200 bg-gray-50 py-2 text-[13px] text-gray-300"
         >
-          {busy === "reset" ? "Reiniciando..." : "↺ Reiniciar"}
+          🔒 Reiniciar
         </button>
       </div>
       <button
@@ -362,51 +350,100 @@ function ContactManager() {
   );
 }
 
+function Toggle({ on, onClick, disabled }: { on: boolean; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={on}
+      className={cn(
+        "relative h-6 w-11 flex-none rounded-full transition-colors disabled:opacity-50",
+        on ? "bg-blue-600" : "bg-gray-300",
+      )}
+    >
+      <span
+        className={cn(
+          "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
+          on ? "translate-x-[22px]" : "translate-x-0.5",
+        )}
+      />
+    </button>
+  );
+}
+
 function SettingsManager() {
   const { data, mutate } = useSettings();
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const aiEnabled = data?.ai_enabled ?? false;
+  const liveEnabled = data?.live_scraping_enabled ?? false;
 
-  async function toggleAi() {
-    setBusy(true);
+  async function toggle(key: string, value: boolean) {
+    setBusy(key);
     try {
-      await setSetting("ai_enabled", !aiEnabled);
+      await setSetting(key, value);
       await mutate();
     } finally {
-      setBusy(false);
+      setBusy(null);
+    }
+  }
+
+  async function syncNow() {
+    setBusy("sync");
+    setSyncMsg(null);
+    try {
+      const r = await liveSyncNow();
+      setSyncMsg(
+        r.enabled
+          ? `✅ Sincronizado · ${r.updated ?? 0} partidos actualizados (${r.games ?? 0} en promiedos)`
+          : "Está apagado: prendé el scraping primero.",
+      );
+    } catch {
+      setSyncMsg("No se pudo sincronizar.");
+    } finally {
+      setBusy(null);
     }
   }
 
   return (
     <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3.5">
       <div className="mb-2.5 text-[13px] font-medium text-gray-900">⚙️ Ajustes</div>
-      <div className="flex items-center justify-between">
+
+      <div className="flex items-center justify-between border-b border-gray-50 pb-3">
         <div className="pr-3">
           <div className="text-[13px] text-gray-800">Predicción por IA</div>
           <p className="text-[11px] text-gray-400">
-            Muestra/oculta el botón “Generar con IA” y los análisis de Claude en toda la app.
+            Muestra/oculta “Generar con IA” y los análisis de Claude en toda la app.
           </p>
         </div>
-        <button
-          onClick={toggleAi}
-          disabled={busy}
-          aria-pressed={aiEnabled}
-          className={cn(
-            "relative h-6 w-11 flex-none rounded-full transition-colors disabled:opacity-50",
-            aiEnabled ? "bg-blue-600" : "bg-gray-300",
-          )}
-        >
-          <span
-            className={cn(
-              "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
-              aiEnabled ? "translate-x-[22px]" : "translate-x-0.5",
-            )}
-          />
-        </button>
+        <Toggle on={aiEnabled} disabled={busy !== null} onClick={() => toggle("ai_enabled", !aiEnabled)} />
       </div>
-      <p className="mt-2 text-[11px] text-gray-400">
-        Estado actual: <span className="font-medium text-gray-600">{aiEnabled ? "Encendida" : "Apagada"}</span>
-      </p>
+
+      <div className="flex items-center justify-between pt-3">
+        <div className="pr-3">
+          <div className="text-[13px] text-gray-800">Resultados en vivo (promiedos)</div>
+          <p className="text-[11px] text-gray-400">
+            Actualiza marcador, minuto y estado automáticamente desde promiedos durante los partidos.
+            Igual podés cargar/editar resultados a mano.
+          </p>
+        </div>
+        <Toggle on={liveEnabled} disabled={busy !== null} onClick={() => toggle("live_scraping_enabled", !liveEnabled)} />
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <span className="text-[11px] text-gray-400">
+          {liveEnabled ? "🟢 Encendido" : "⚫ Apagado"}
+        </span>
+        {liveEnabled && (
+          <button
+            onClick={syncNow}
+            disabled={busy !== null}
+            className="rounded-lg border border-gray-200 px-2.5 py-1 text-[11px] text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          >
+            {busy === "sync" ? "Sincronizando…" : "Sincronizar ahora"}
+          </button>
+        )}
+        {syncMsg && <span className="text-[11px] text-gray-500">{syncMsg}</span>}
+      </div>
     </div>
   );
 }

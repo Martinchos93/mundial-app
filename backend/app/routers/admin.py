@@ -315,6 +315,14 @@ def reset_match_result(match_id: int, db: Session = Depends(get_db)):
     return {"match_id": m.id, "status": m.status, "cleared_predictions": len(pred_ids)}
 
 
+@router.post("/live/sync")
+def live_sync(db: Session = Depends(get_db)):
+    """Run a promiedos live update right now (respects the on/off toggle)."""
+    from app.services import promiedos
+
+    return promiedos.fetch_and_apply(db)
+
+
 @router.get("/stats")
 def global_stats(db: Session = Depends(get_db)):
     return {

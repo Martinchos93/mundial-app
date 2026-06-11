@@ -66,6 +66,23 @@ async def _job_live() -> None:
         logger.exception("Live sync job failed")
 
 
+async def _job_promiedos() -> None:
+    """Update live scores from promiedos when enabled + a match is live/imminent."""
+    from app.services import promiedos
+
+    db = SessionLocal()
+    try:
+        if not promiedos.is_enabled(db) or not _has_active_window(db):
+            return
+        res = promiedos.fetch_and_apply(db)
+        if res.get("updated"):
+            logger.info("promiedos updated %d matches", res["updated"])
+    except Exception:  # noqa: BLE001
+        logger.exception("promiedos live job failed")
+    finally:
+        db.close()
+
+
 async def _job_today() -> None:
     db = SessionLocal()
     try:
@@ -123,6 +140,7 @@ def start_scheduler() -> None:
     # Conservative cadences for the 100 req/day free plan. The DB gating in
     # _job_live / _job_today keeps idle periods at zero external requests.
     scheduler.add_job(_job_live, "interval", seconds=60, id="live", max_instances=1)
+    scheduler.add_job(_job_promiedos, "interval", seconds=60, id="promiedos", max_instances=1)
     scheduler.add_job(_job_today, "interval", minutes=15, id="today", max_instances=1)
     scheduler.add_job(_job_hourly, "interval", hours=6, id="hourly", max_instances=1)
     scheduler.add_job(_job_ai_pregame, "interval", minutes=15, id="ai_pregame", max_instances=1)

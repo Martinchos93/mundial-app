@@ -12,6 +12,7 @@ from app.models import Setting
 # Defaults applied when a key has never been set.
 DEFAULTS: dict[str, Any] = {
     "ai_enabled": False,  # show the "Generar con IA" prediction option
+    "live_scraping_enabled": False,  # auto-update live scores from promiedos
 }
 
 router = APIRouter(tags=["settings"])

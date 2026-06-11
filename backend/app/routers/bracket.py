@@ -65,8 +65,11 @@ def simulate_tournament(db: Session = Depends(get_db)):
 
 @router.post("/admin/bracket/reset", dependencies=[Depends(get_current_admin)])
 def reset_tournament():
-    """Demo: reset the fixture back to scheduled (re-seeds; clears results/predictions)."""
-    from app.seed_2026 import seed
+    """DISABLED: reseeding wipes every result and prediction. Kept blocked so
+    nobody accidentally destroys the tournament data."""
+    from fastapi import HTTPException
 
-    n = seed()
-    return {"reseeded_matches": n}
+    raise HTTPException(
+        status_code=403,
+        detail="Reiniciar está deshabilitado: borraría todos los resultados y pronósticos.",
+    )

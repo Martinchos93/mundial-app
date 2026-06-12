@@ -105,6 +105,49 @@ def _score_of(game: dict) -> tuple[int | None, int | None]:
     return None, None
 
 
+GAME_DETAIL_URL = "https://www.promiedos.com.ar/game/{slug}/{gid}"
+# promiedos timeline event types
+_EV_YELLOW = 4
+_EV_RED = 5
+
+
+def _fetch_game_detail(slug: str, gid: str) -> dict | None:
+    """Yellow cards (and booked/sent-off player names) live ONLY on the per-game
+    detail page, not the league feed. Returns counts oriented to promiedos team
+    order (index 0 = teams[0], 1 = teams[1]) plus combined name lists, or None.
+    """
+    try:
+        html = _http_get(GAME_DETAIL_URL.format(slug=slug, gid=gid))
+        i = html.find('{"id":"%s"' % gid)
+        if i < 0:
+            return None
+        obj, _ = _DECODER.raw_decode(html, i)
+    except Exception:  # noqa: BLE001
+        logger.exception("promiedos detail fetch failed for %s/%s", slug, gid)
+        return None
+
+    yellows: list[int | None] = [None, None]
+    for s in obj.get("statistics") or []:
+        if (s.get("name") or "").strip().lower() == "tarjetas amarillas":
+            vals = s.get("values") or []
+            if len(vals) == 2:
+                yellows = [_int(vals[0]), _int(vals[1])]
+
+    booked: list[str] = []
+    sent_off: list[str] = []
+    for stage in obj.get("events") or []:
+        for row in stage.get("rows") or []:
+            for e in row.get("events") or []:
+                name = (e.get("texts") or [""])[0].strip()
+                if not name:
+                    continue
+                if e.get("type") == _EV_YELLOW:
+                    booked.append(name)
+                elif e.get("type") == _EV_RED:
+                    sent_off.append(name)
+    return {"yellows": yellows, "booked": booked, "sent_off": sent_off}
+
+
 def fetch_and_apply(db: Session) -> dict:
     """Pull current WC games from promiedos and update our group matches.
     Returns a small summary. No-op (and no network) when the toggle is off."""
@@ -180,6 +223,22 @@ def fetch_and_apply(db: Session) -> dict:
         m.scorers = (hg + ag) or None  # goalscorer names (for Stats + scoring)
         gt = _int(g.get("game_time"))
         m.minute = gt if (gt is not None and gt >= 0) else None
+
+        # Yellows + booked/sent-off names are NOT in the league feed — pull them
+        # from the game detail page so the yellow/card scoring can land.
+        slug, gid = g.get("url_name"), g.get("id")
+        if slug and gid:
+            detail = _fetch_game_detail(str(slug), str(gid))
+            if detail:
+                y0, y1 = detail["yellows"]
+                hy, ay = (y0, y1) if m.home_team == n0 else (y1, y0)
+                if hy is not None:
+                    m.home_yellows = hy
+                if ay is not None:
+                    m.away_yellows = ay
+                m.booked = detail["booked"] or None  # combined names; scoring matches by name
+                if detail["sent_off"]:
+                    m.red_players = detail["sent_off"]
 
         # One-time visibility into the live structure (helps verify score field).
         if (g.get("status") or {}).get("enum") not in (1, None):

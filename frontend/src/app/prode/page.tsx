@@ -133,7 +133,7 @@ export default function ProdePage() {
               return <MatchCard key={m.id} match={m} prediction={pred} showPrediction onSelect={setSelected} />;
             }
             return pred ? (
-              <PredictionForm key={m.id} match={m} existing={pred} />
+              <PredictionForm key={m.id} match={m} existing={pred} columnId={columnId} onSaved={() => mutatePreds()} />
             ) : (
               <MatchCard key={m.id} match={m} />
             );

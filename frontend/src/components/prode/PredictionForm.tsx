@@ -130,7 +130,10 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
 
   const picks = Object.values(events).filter((e) => e.g || e.y || e.r);
 
-  if ((!token || !columnId) && !existing?.is_scored) {
+  // Only nudge to join when there's genuinely no prediction to show. A match that
+  // already has the user's pick (live or finished) must render it, even if the
+  // columnId prop wasn't threaded through.
+  if ((!token || !columnId) && !existing) {
     return (
       <div className="rounded-xl border border-gray-200 bg-white p-4 text-center">
         <p className="mb-3 text-sm text-gray-500">Unite a un grupo para hacer tu predicción.</p>

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -43,7 +44,18 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=AuthResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == payload.username).first()
+    # Accept either username or email (case-insensitive) — users routinely type
+    # their email at the login box.
+    ident = (payload.username or "").strip()
+    user = (
+        db.query(User)
+        .filter(
+            func.lower(User.username) == ident.lower(),
+        )
+        .first()
+    )
+    if user is None and "@" in ident:
+        user = db.query(User).filter(func.lower(User.email) == ident.lower()).first()
     if user is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario o contraseña inválidos")
     return AuthResponse(token=create_access_token(user.id), user=UserOut.model_validate(user))

@@ -695,7 +695,6 @@ function ResultsManager() {
             awayTeam={sel.away_team?.name || nm(sel, "away")}
             value={events}
             onChange={setEvents}
-            maxGoals={9}
           />
 
           {msg && <p className="mt-2 text-center text-[12px] text-gray-600">{msg}</p>}

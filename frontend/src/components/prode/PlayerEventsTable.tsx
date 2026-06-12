@@ -13,9 +13,10 @@ interface Props {
   value: EventMap;
   onChange: (next: EventMap) => void;
   disabled?: boolean;
-  maxGoals?: number;
-  /** Max players that can carry a goal / a yellow / a red (anti-gaming). Infinity = no cap. */
-  maxGoalPicks?: number;
+  /** Predicted scoreline — goals assigned to each team's players can't exceed it. */
+  homeGoals?: number;
+  awayGoals?: number;
+  /** Max players that can carry a yellow / a red (anti-gaming). Infinity = no cap. */
   maxYellowPicks?: number;
   maxRedPicks?: number;
 }
@@ -72,16 +73,24 @@ export default function PlayerEventsTable({
   value,
   onChange,
   disabled,
-  maxGoals = 5,
-  maxGoalPicks = Infinity,
+  homeGoals = Infinity,
+  awayGoals = Infinity,
   maxYellowPicks = Infinity,
   maxRedPicks = Infinity,
 }: Props) {
   const { data: home } = useSquad(homeTeam || null);
   const { data: away } = useSquad(awayTeam || null);
 
-  const capped = [maxGoalPicks, maxYellowPicks, maxRedPicks].some((n) => Number.isFinite(n));
-  const goalUsed = Object.values(value).filter((e) => (e.g ?? 0) > 0).length;
+  const capped = [homeGoals, awayGoals, maxYellowPicks, maxRedPicks].some((n) => Number.isFinite(n));
+  // Goals assigned per team — must not exceed that team's predicted score.
+  const homeGoalSum = Object.values(value)
+    .filter((e) => e.team === homeTeam)
+    .reduce((s, e) => s + (e.g ?? 0), 0);
+  const awayGoalSum = Object.values(value)
+    .filter((e) => e.team === awayTeam)
+    .reduce((s, e) => s + (e.g ?? 0), 0);
+  const totalGoalSum = homeGoalSum + awayGoalSum;
+  const totalGoals = (Number.isFinite(homeGoals) ? homeGoals : 0) + (Number.isFinite(awayGoals) ? awayGoals : 0);
   const yellowUsed = Object.values(value).filter((e) => (e.y ?? 0) > 0).length;
   const redUsed = Object.values(value).filter((e) => (e.r ?? 0) > 0).length;
 
@@ -90,8 +99,12 @@ export default function PlayerEventsTable({
     onChange({ ...value, [p.name]: { ...cur, name: p.name, team, [field]: v } });
   }
 
-  const Section = ({ team, players }: { team: string; players?: SquadPlayer[] }) => (
-    <>
+  const Section = ({ team, players }: { team: string; players?: SquadPlayer[] }) => {
+    const teamGoals = team === homeTeam ? homeGoals : awayGoals;
+    const teamGoalSum = team === homeTeam ? homeGoalSum : awayGoalSum;
+    const teamGoalCap = Number.isFinite(teamGoals) ? teamGoals : Infinity;
+    return (
+      <>
       <tr className="bg-gray-50">
         <td colSpan={4} className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
           {team}
@@ -110,7 +123,8 @@ export default function PlayerEventsTable({
         const y = ev?.y ?? 0;
         const r = ev?.r ?? 0;
         const touched = g || y || r;
-        const goalAtCap = g === 0 && goalUsed >= maxGoalPicks;
+        // No more goals than this team's predicted score (sum across its players).
+        const goalAtCap = teamGoalSum >= teamGoalCap;
         const yellowAtCap = y === 0 && yellowUsed >= maxYellowPicks;
         const redAtCap = r === 0 && redUsed >= maxRedPicks;
         return (
@@ -122,7 +136,7 @@ export default function PlayerEventsTable({
               </span>
             </td>
             <td className="px-1 py-1.5">
-              <MiniStepper tone="goal" max={maxGoals} disabled={disabled} disablePlus={goalAtCap} value={g} onChange={(v) => setField(p, team, "g", v)} />
+              <MiniStepper tone="goal" max={teamGoalCap} disabled={disabled} disablePlus={goalAtCap} value={g} onChange={(v) => setField(p, team, "g", v)} />
             </td>
             <td className="px-1 py-1.5">
               <MiniStepper tone="yellow" max={1} disabled={disabled} disablePlus={yellowAtCap} value={y} onChange={(v) => setField(p, team, "y", v)} />
@@ -134,13 +148,14 @@ export default function PlayerEventsTable({
         );
       })}
     </>
-  );
+    );
+  };
 
   return (
     <div>
       {capped && (
         <div className="mb-1 flex items-center justify-end gap-2 text-[10px] text-gray-400">
-          <span className={cn(goalUsed >= maxGoalPicks && "font-semibold text-blue-600")}>⚽ {goalUsed}/{maxGoalPicks}</span>
+          <span className={cn(totalGoalSum >= totalGoals && totalGoals > 0 && "font-semibold text-blue-600")}>⚽ {totalGoalSum}/{totalGoals}</span>
           <span className={cn(yellowUsed >= maxYellowPicks && "font-semibold text-amber-500")}>🟨 {yellowUsed}/{maxYellowPicks}</span>
           <span className={cn(redUsed >= maxRedPicks && "font-semibold text-red-500")}>🟥 {redUsed}/{maxRedPicks}</span>
         </div>

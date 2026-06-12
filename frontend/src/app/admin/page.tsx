@@ -160,30 +160,41 @@ function UsersTable() {
   const [page, setPage] = useState(1);
   const [busy, setBusy] = useState<number | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [resetTarget, setResetTarget] = useState<{ id: number; username: string } | null>(null);
+  const [resetPw, setResetPw] = useState("");
+  const [resetErr, setResetErr] = useState<string | null>(null);
   const { data, isLoading, mutate } = useAdminUsers(q, page, 10);
 
   useEffect(() => {
     setPage(1);
   }, [q]);
 
-  async function resetPassword(id: number, username: string) {
-    const pw = window.prompt(`Nueva contraseña para @${username} (mínimo 6 caracteres):`);
-    if (pw == null) return;
-    if (pw.trim().length < 6) {
-      setMsg("La contraseña debe tener al menos 6 caracteres.");
+  function openReset(id: number, username: string) {
+    setResetTarget({ id, username });
+    setResetPw("");
+    setResetErr(null);
+  }
+
+  async function submitReset() {
+    if (!resetTarget) return;
+    if (resetPw.trim().length < 6) {
+      setResetErr("La contraseña debe tener al menos 6 caracteres.");
       return;
     }
-    setBusy(id);
-    setMsg(null);
+    setBusy(resetTarget.id);
+    setResetErr(null);
     try {
-      await resetUserPassword(id, pw.trim());
-      setMsg(`✅ Contraseña de @${username} actualizada.`);
+      await resetUserPassword(resetTarget.id, resetPw.trim());
+      setMsg(`✅ Contraseña de @${resetTarget.username} actualizada.`);
+      setResetTarget(null);
     } catch (e: unknown) {
       const status = (e as { response?: { status?: number } })?.response?.status;
-      setMsg(
+      setResetErr(
         status === 404 || status === 405
           ? "El servidor todavía no tiene esta función (esperá unos minutos al redeploy)."
-          : "No se pudo actualizar la contraseña.",
+          : status === 401 || status === 403
+            ? "Tu sesión no tiene permisos de admin. Cerrá sesión y volvé a entrar."
+            : "No se pudo actualizar la contraseña.",
       );
     } finally {
       setBusy(null);
@@ -260,7 +271,7 @@ function UsersTable() {
                 {busy === u.id ? "…" : u.is_admin ? "Quitar admin" : "Hacer admin"}
               </button>
               <button
-                onClick={() => resetPassword(u.id, u.username)}
+                onClick={() => openReset(u.id, u.username)}
                 disabled={busy === u.id}
                 className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-[11px] text-gray-600 hover:bg-gray-50 disabled:opacity-50"
               >
@@ -279,6 +290,50 @@ function UsersTable() {
           <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="rounded-lg border border-gray-200 p-1.5 text-gray-500 disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button>
           <span className="text-[12px] text-gray-500">{page} / {totalPages}</span>
           <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="rounded-lg border border-gray-200 p-1.5 text-gray-500 disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button>
+        </div>
+      )}
+
+      {resetTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setResetTarget(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-[14px] font-semibold text-gray-900">
+              Resetear clave de @{resetTarget.username}
+            </h3>
+            <p className="mt-0.5 text-[11px] text-gray-400">
+              Escribí la nueva contraseña (mínimo 6 caracteres).
+            </p>
+            <input
+              autoFocus
+              type="text"
+              value={resetPw}
+              onChange={(e) => setResetPw(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && submitReset()}
+              placeholder="Nueva contraseña"
+              className="mt-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-[14px] focus:border-blue-400 focus:outline-none"
+            />
+            {resetErr && <p className="mt-2 text-[11px] text-red-500">{resetErr}</p>}
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={() => setResetTarget(null)}
+                className="flex-1 rounded-lg border border-gray-200 py-2 text-[12px] font-medium text-gray-500 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={submitReset}
+                disabled={busy === resetTarget.id}
+                className="flex-1 rounded-lg bg-blue-600 py-2 text-[12px] font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {busy === resetTarget.id ? "Guardando…" : "Guardar"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

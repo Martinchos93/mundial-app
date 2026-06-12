@@ -14,6 +14,7 @@ from app.schemas.auth import (
     UserOut,
     MeResponse,
     MembershipOut,
+    ChangePasswordRequest,
     ForgotPasswordRequest,
     ResetPasswordRequest,
 )
@@ -100,6 +101,20 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
     db.refresh(user)
     # Log them straight in so they don't have to retype the brand-new password.
     return AuthResponse(token=create_access_token(user.id), user=UserOut.model_validate(user))
+
+
+@router.post("/change-password")
+def change_password(
+    payload: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Logged-in user changes their own password (requires the current one)."""
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta.")
+    current_user.password_hash = hash_password(payload.new_password)
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/me", response_model=MeResponse)

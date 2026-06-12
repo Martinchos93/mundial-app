@@ -758,6 +758,14 @@ export async function login(username: string, password: string): Promise<Session
   return res.data.user as SessionUser;
 }
 
+/** Logged-in user changes their own password (needs the current one). */
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  await http.post(`/auth/change-password`, {
+    current_password: currentPassword,
+    new_password: newPassword,
+  });
+}
+
 /** Request a password-reset email. Always succeeds (no account enumeration). */
 export async function forgotPassword(email: string): Promise<string> {
   const res = await http.post(`/auth/forgot-password`, { email });

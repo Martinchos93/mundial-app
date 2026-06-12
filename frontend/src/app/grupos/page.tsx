@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, LogIn, Copy, Check, UserCheck, X, LogOut, Crown } from "lucide-react";
+import { Plus, LogIn, Copy, Check, UserCheck, X, LogOut, Crown, KeyRound } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import GroupBreakdown from "@/components/prode/GroupBreakdown";
+import ChangePasswordModal from "@/components/account/ChangePasswordModal";
 import {
   useMe,
   useLeaderboard,
@@ -118,6 +119,7 @@ export default function GruposPage() {
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showChangePwd, setShowChangePwd] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined" && !getToken()) router.replace("/login");
@@ -183,8 +185,13 @@ export default function GruposPage() {
             <div className="text-[11px] text-gray-400">@{user?.username}</div>
           </div>
         </div>
-        <button onClick={logout} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700"><LogOut className="h-4 w-4" /> Salir</button>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setShowChangePwd(true)} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700"><KeyRound className="h-4 w-4" /> Clave</button>
+          <button onClick={logout} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700"><LogOut className="h-4 w-4" /> Salir</button>
+        </div>
       </header>
+
+      {showChangePwd && <ChangePasswordModal onClose={() => setShowChangePwd(false)} />}
 
       <main className="px-4 pb-24 pt-3">
         <div className="mb-3 flex items-center justify-between">

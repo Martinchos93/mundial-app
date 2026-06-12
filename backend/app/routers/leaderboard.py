@@ -125,6 +125,16 @@ def breakdown(group_id: int, db: Session = Depends(get_db)):
             Score.total,
             Prediction.pred_home_score,
             Prediction.pred_away_score,
+            Prediction.pred_yellows,
+            Prediction.pred_reds,
+            Prediction.pred_scorers,
+            Score.pts_result,
+            Score.pts_exact,
+            Score.pts_bonus,
+            Score.pts_yellows,
+            Score.pts_reds,
+            Score.pts_scorers,
+            Score.pts_cards,
         )
         .join(Score, Score.prediction_id == Prediction.id)
         .join(Match, Match.id == Prediction.match_id)
@@ -137,10 +147,26 @@ def breakdown(group_id: int, db: Session = Depends(get_db)):
     )
     points: dict[int, dict[int, int]] = {}
     preds: dict[int, dict[int, str]] = {}
-    for uid, mid, total, ph, pa in rows:
+    comps: dict[int, dict[int, dict]] = {}
+    for (
+        uid, mid, total, ph, pa, pyel, pred, pscorers,
+        p_result, p_exact, p_bonus, p_yellows, p_reds, p_scorers, p_cards,
+    ) in rows:
         slot = points.setdefault(mid, {})
         slot[uid] = slot.get(uid, 0) + int(total or 0)
         preds.setdefault(mid, {})[uid] = f"{ph}-{pa}"
+        comps.setdefault(mid, {})[uid] = {
+            "pred_yellows": pyel or 0,
+            "pred_reds": pred or 0,
+            "pred_scorers": pscorers or [],
+            "pts_result": p_result or 0,
+            "pts_exact": p_exact or 0,
+            "pts_bonus": p_bonus or 0,
+            "pts_yellows": p_yellows or 0,
+            "pts_reds": p_reds or 0,
+            "pts_scorers": p_scorers or 0,
+            "pts_cards": p_cards or 0,
+        }
 
     matches = (
         db.query(Match).filter(Match.id.in_(points.keys())).order_by(Match.kickoff_utc.desc()).all()
@@ -156,8 +182,14 @@ def breakdown(group_id: int, db: Session = Depends(get_db)):
             "away_score": m.away_score,
             "phase": m.phase,
             "kickoff_utc": m.kickoff_utc.isoformat() if m.kickoff_utc else None,
+            "home_yellows": m.home_yellows,
+            "away_yellows": m.away_yellows,
+            "home_reds": m.home_reds,
+            "away_reds": m.away_reds,
+            "scorers": m.scorers or [],
             "points": points.get(m.id, {}),
             "preds": preds.get(m.id, {}),
+            "comps": comps.get(m.id, {}),
         }
         for m in matches
     ]

@@ -521,6 +521,18 @@ export interface BreakdownMember {
   name: string;
   avatar_emoji: string;
 }
+export interface BreakdownComp {
+  pred_yellows: number;
+  pred_reds: number;
+  pred_scorers: string[];
+  pts_result: number;
+  pts_exact: number;
+  pts_bonus: number;
+  pts_yellows: number;
+  pts_reds: number;
+  pts_scorers: number;
+  pts_cards: number;
+}
 export interface BreakdownMatch {
   id: number;
   home_team: string;
@@ -529,8 +541,14 @@ export interface BreakdownMatch {
   away_score: number | null;
   phase: string | null;
   kickoff_utc: string | null;
+  home_yellows: number;
+  away_yellows: number;
+  home_reds: number;
+  away_reds: number;
+  scorers: string[];
   points: Record<string, number>;
   preds: Record<string, string>;
+  comps: Record<string, BreakdownComp>;
 }
 export interface GroupBreakdown {
   members: BreakdownMember[];

@@ -81,12 +81,26 @@ function Stepper({
   );
 }
 
-function ScoredBox({ label, value }: { label: string; value: number }) {
-  const win = value > 0;
+function DetailRow({ icon, label, detail, pts }: { icon: string; label: string; detail: string; pts: number }) {
+  const win = pts > 0;
   return (
-    <div className={cn("rounded-lg px-1 py-2 text-center", win ? "bg-green-50" : "bg-gray-50")}>
-      <div className={cn("text-base font-semibold", win ? "text-green-600" : "text-gray-400")}>+{value}</div>
-      <div className="mt-0.5 text-[9px] text-gray-400">{label}</div>
+    <div className="flex items-center gap-2.5 border-t border-gray-50 py-2 first:border-t-0">
+      <span className="w-5 flex-none text-center text-[14px]">{icon}</span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1 text-[12.5px] font-medium text-gray-800">
+          {label}
+          <span className={win ? "text-green-600" : "text-gray-300"}>{win ? "✓" : "✗"}</span>
+        </div>
+        <div className="text-[11px] leading-snug text-gray-400">{detail}</div>
+      </div>
+      <span
+        className={cn(
+          "flex-none rounded-lg px-2 py-1 text-[12.5px] font-semibold",
+          win ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-400",
+        )}
+      >
+        +{pts}
+      </span>
     </div>
   );
 }
@@ -135,18 +149,63 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
   // Scored breakdown view
   if (existing?.is_scored) {
     const scorers = match.scorers ?? [];
-    const reds_ = match.red_players ?? [];
-    const booked = match.booked ?? [];
-    const playerLine = (p: PlayerEvent) => {
-      const parts: string[] = [];
-      if (p.g) {
-        const got = scorers.filter((n) => n === p.name).length;
-        parts.push(`⚽${p.g}${got >= p.g ? " ✅" : got > 0 ? ` ⚠️${got}` : " ❌"}`);
-      }
-      if (p.y) parts.push(`🟨${booked.includes(p.name) && !reds_.includes(p.name) ? "✅" : "❌"}`);
-      if (p.r) parts.push(`🟥${reds_.includes(p.name) ? "✅" : "❌"}`);
-      return `${p.name} ${parts.join(" ")}`;
-    };
+    const realYellows = (match.home_yellows ?? 0) + (match.away_yellows ?? 0);
+    const realReds = (match.home_reds ?? 0) + (match.away_reds ?? 0);
+    const outcome = (h: number | null, a: number | null) =>
+      h == null || a == null ? "—" : h > a ? `gana ${homeName}` : h < a ? `gana ${awayName}` : "empate";
+    const predScorers = (existing.pred_players ?? []).filter((p) => p.g);
+    const scorersHit = predScorers.filter(
+      (p) => scorers.filter((n) => n === p.name).length >= (p.g ?? 1),
+    );
+
+    const rows: { icon: string; label: string; detail: string; pts: number }[] = [
+      {
+        icon: "🎯",
+        label: "Resultado",
+        detail: `Predijiste «${outcome(existing.pred_home_score, existing.pred_away_score)}» · fue «${outcome(
+          match.home_score,
+          match.away_score,
+        )}»`,
+        pts: existing.pts_result,
+      },
+      {
+        icon: "🔢",
+        label: "Marcador exacto",
+        detail: `Predijiste ${existing.pred_home_score}-${existing.pred_away_score} · fue ${match.home_score}-${match.away_score}`,
+        pts: existing.pts_goals + existing.pts_exact_score,
+      },
+      {
+        icon: "🟨",
+        label: "Amarillas del partido",
+        detail: `Predijiste ${existing.pred_yellows} · hubo ${realYellows}`,
+        pts: existing.pts_yellows_scored,
+      },
+      {
+        icon: "🟥",
+        label: "Rojas del partido",
+        detail: `Predijiste ${existing.pred_reds} · hubo ${realReds}`,
+        pts: existing.pts_reds_scored,
+      },
+    ];
+    if (predScorers.length > 0) {
+      rows.push({
+        icon: "⚽",
+        label: "Goleadores",
+        detail: `Acertaste ${scorersHit.length}/${predScorers.length}: ${predScorers
+          .map((p) => `${p.name}${scorersHit.includes(p) ? " ✅" : " ❌"}`)
+          .join(" · ")}`,
+        pts: existing.pts_scorers,
+      });
+    }
+    if (existing.pts_cards > 0 || (existing.pred_players ?? []).some((p) => p.y || p.r)) {
+      rows.push({
+        icon: "🟨🟥",
+        label: "Tarjetas a tus jugadores",
+        detail: "Puntos por amarillas/rojas que les pegaron a los jugadores que marcaste",
+        pts: existing.pts_cards,
+      });
+    }
+
     return (
       <div className="rounded-xl border border-gray-200 bg-white p-3.5">
         <div className="mb-1.5 flex items-center justify-between">
@@ -156,31 +215,25 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
           </span>
           <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-500">🔒 Cerrada</span>
         </div>
-        <p className="mb-3 text-[11px] text-gray-400">
+        <p className="mb-2 text-[11px] text-gray-400">
           Tu predicción:{" "}
           <span className="font-medium text-gray-600">
             {existing.pred_home_score}-{existing.pred_away_score}
           </span>
         </p>
-        <div className="mb-3 grid grid-cols-3 gap-1.5">
-          <ScoredBox label="Resultado" value={existing.pts_result} />
-          <ScoredBox label="Marcador exacto" value={existing.pts_goals + existing.pts_exact_score} />
-          <ScoredBox label="🟨 Amarillas" value={existing.pts_yellows_scored} />
-          <ScoredBox label="🟥 Rojas" value={existing.pts_reds_scored} />
-          <ScoredBox label="⚽ Goleadores" value={existing.pts_scorers} />
-          <ScoredBox label="🟨🟥 Tarjetas jug." value={existing.pts_cards} />
+
+        <div className="mb-2 rounded-lg border border-gray-100 px-2.5">
+          {rows.map((r) => (
+            <DetailRow key={r.label} {...r} />
+          ))}
         </div>
+
         {scorers.length > 0 && (
-          <p className="mb-1 text-[11px] text-gray-500">
+          <p className="mb-2 text-[11px] text-gray-500">
             ⚽ Marcaron: <span className="text-gray-700">{scorers.join(", ")}</span>
           </p>
         )}
-        {(existing.pred_players ?? []).length > 0 && (
-          <p className="mb-2 text-[11px] text-gray-400">
-            Tus picks: {(existing.pred_players ?? []).map(playerLine).join(" · ")}
-          </p>
-        )}
-        <div className="text-center text-[13px] font-semibold text-green-600">
+        <div className="rounded-lg bg-green-50 py-1.5 text-center text-[13px] font-semibold text-green-600">
           Total: +{existing.total_points} pts
         </div>
       </div>

@@ -161,9 +161,11 @@ def calculate_score(
         breakdown.pts_result = int(cfg["pts_result"])
     if exact_score:
         breakdown.pts_exact = int(cfg["pts_exact_goals"])
-    if pred_yellows == actual_yellows:
+    # Only reward an ACTIVE prediction (> 0). Predicting 0 is the default "didn't
+    # bother", so 0-vs-0 must not hand out a free point on the many card-less games.
+    if pred_yellows > 0 and pred_yellows == actual_yellows:
         breakdown.pts_yellows = int(cfg["pts_yellows"])
-    if pred_reds == actual_reds:
+    if pred_reds > 0 and pred_reds == actual_reds:
         breakdown.pts_reds = int(cfg["pts_reds"])
     if exact_score:  # exact scoreline implies the result is correct too
         breakdown.pts_bonus = int(cfg["pts_bonus"])

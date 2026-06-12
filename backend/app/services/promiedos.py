@@ -197,11 +197,30 @@ def fetch_and_apply(db: Session) -> dict:
         else:
             hs, as_, hr, ar, hg, ag = s1, s0, r1, r0, g1, g0
 
-        # Already finalized: only fill MISSING goalscorers (never overwrite a
-        # manual result), then re-score so the goleadores points land.
+        # Already finalized: only FILL missing data (never overwrite a manual
+        # result), then re-score so the late points land. Covers goalscorers and
+        # yellows that arrived after kickoff status flipped to "finished" — e.g.
+        # a 90'+ booking that Promiedos posted a beat after the final whistle.
         if m.status == "finished":
+            changed_fin = False
             if not m.scorers and (hg or ag) and m.home_score == hs and m.away_score == as_:
                 m.scorers = (hg + ag) or None
+                changed_fin = True
+            # Yellows only when we never captured any (0-0), so we don't clobber a
+            # value already scraped or hand-edited.
+            if (m.home_yellows or 0) == 0 and (m.away_yellows or 0) == 0:
+                slug, gid = g.get("url_name"), g.get("id")
+                detail = _fetch_game_detail(str(slug), str(gid)) if (slug and gid) else None
+                if detail:
+                    y0, y1 = detail["yellows"]
+                    hy, ay = (y0, y1) if m.home_team == n0 else (y1, y0)
+                    if (hy or 0) > 0 or (ay or 0) > 0:
+                        m.home_yellows, m.away_yellows = hy or 0, ay or 0
+                        m.booked = detail["booked"] or None
+                        if detail["sent_off"]:
+                            m.red_players = detail["sent_off"]
+                        changed_fin = True
+            if changed_fin:
                 db.flush()
                 recalculate_match_scores(db, m)
                 updated += 1

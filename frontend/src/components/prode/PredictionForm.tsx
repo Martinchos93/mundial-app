@@ -177,13 +177,19 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
       {
         icon: "🟨",
         label: "Amarillas del partido",
-        detail: `Predijiste ${existing.pred_yellows} · hubo ${realYellows}`,
+        detail:
+          existing.pred_yellows > 0
+            ? `Predijiste ${existing.pred_yellows} · hubo ${realYellows}`
+            : `No predijiste amarillas (hubo ${realYellows})`,
         pts: existing.pts_yellows_scored,
       },
       {
         icon: "🟥",
         label: "Rojas del partido",
-        detail: `Predijiste ${existing.pred_reds} · hubo ${realReds}`,
+        detail:
+          existing.pred_reds > 0
+            ? `Predijiste ${existing.pred_reds} · hubo ${realReds}`
+            : `No predijiste rojas (hubo ${realReds})`,
         pts: existing.pts_reds_scored,
       },
     ];

@@ -77,13 +77,19 @@ function buildDetail(r: Row): { icon: string; label: string; detail: string; pts
     {
       icon: "🟨",
       label: "Amarillas del partido",
-      detail: `Predijo ${c.pred_yellows} · hubo ${r.realYellows}`,
+      detail:
+        c.pred_yellows > 0
+          ? `Predijo ${c.pred_yellows} · hubo ${r.realYellows}`
+          : `No predijo amarillas (hubo ${r.realYellows})`,
       pts: c.pts_yellows,
     },
     {
       icon: "🟥",
       label: "Rojas del partido",
-      detail: `Predijo ${c.pred_reds} · hubo ${r.realReds}`,
+      detail:
+        c.pred_reds > 0
+          ? `Predijo ${c.pred_reds} · hubo ${r.realReds}`
+          : `No predijo rojas (hubo ${r.realReds})`,
       pts: c.pts_reds,
     },
   ];

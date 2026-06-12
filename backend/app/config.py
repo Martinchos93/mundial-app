@@ -39,7 +39,9 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str = ""  # set in Railway; empty = email disabled (dev)
     RESEND_FROM: str = "ProdeGoat <no-reply@prodegoat.app>"
     # Public URL of the frontend, used to build the reset link in emails.
-    FRONTEND_URL: str = "http://localhost:3000"
+    # Defaults to prod so recovery links are correct even if the env var is unset;
+    # local dev overrides it via backend/.env (FRONTEND_URL=http://localhost:3000).
+    FRONTEND_URL: str = "https://prodegoat.app"
     PASSWORD_RESET_EXPIRE_MINUTES: int = 30
 
     CORS_ORIGINS: str = "http://localhost:3000"

@@ -14,7 +14,7 @@ export default function LoginPage() {
 
   async function handle() {
     if (!username.trim() || !password) {
-      setError("Completá usuario y contraseña.");
+      setError("Completá usuario (o email) y contraseña.");
       return;
     }
     setLoading(true);
@@ -42,7 +42,7 @@ export default function LoginPage() {
           <p className="text-sm text-gray-400">Iniciá sesión para jugar al prode</p>
         </div>
         <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-5">
-          <input className={input} placeholder="Usuario" value={username} onChange={(e) => setUsername(e.target.value)} />
+          <input className={input} placeholder="Usuario o email" value={username} onChange={(e) => setUsername(e.target.value)} />
           <input
             className={input}
             type="password"
@@ -59,6 +59,11 @@ export default function LoginPage() {
           >
             {loading ? "Entrando..." : "Iniciar sesión"}
           </button>
+          <p className="text-center">
+            <Link href="/forgot-password" className="text-xs text-gray-400 hover:text-blue-600">
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </p>
         </div>
         <p className="mt-4 text-center text-sm text-gray-400">
           ¿No tenés cuenta?{" "}

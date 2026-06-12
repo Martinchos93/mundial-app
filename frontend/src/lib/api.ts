@@ -740,6 +740,19 @@ export async function login(username: string, password: string): Promise<Session
   return res.data.user as SessionUser;
 }
 
+/** Request a password-reset email. Always succeeds (no account enumeration). */
+export async function forgotPassword(email: string): Promise<string> {
+  const res = await http.post(`/auth/forgot-password`, { email });
+  return res.data?.message as string;
+}
+
+/** Set a new password from a reset token; logs the user in on success. */
+export async function resetPasswordWithToken(token: string, password: string): Promise<SessionUser> {
+  const res = await http.post(`/auth/reset-password`, { token, password });
+  saveAuth(res.data.token, res.data.user as SessionUser);
+  return res.data.user as SessionUser;
+}
+
 /** Create a new prode; returns its group. */
 export async function createProde(name: string): Promise<Group> {
   const res = await http.post(`/groups`, { name });

@@ -14,8 +14,19 @@ from app.schemas.auth import (
     UserOut,
     MeResponse,
     MembershipOut,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
 )
-from app.security import create_access_token, hash_password, verify_password
+from app.security import (
+    create_access_token,
+    hash_password,
+    verify_password,
+    create_password_reset_token,
+    decode_password_reset_token,
+    _pw_fingerprint,
+)
+from app.services.email import send_password_reset
+from app.config import settings
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -58,6 +69,36 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         user = db.query(User).filter(func.lower(User.email) == ident.lower()).first()
     if user is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario o contraseña inválidos")
+    return AuthResponse(token=create_access_token(user.id), user=UserOut.model_validate(user))
+
+
+@router.post("/forgot-password")
+def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """Send a reset link if the email exists. Always returns the same response so
+    the endpoint can't be used to discover which emails are registered."""
+    email = str(payload.email).strip().lower()
+    user = db.query(User).filter(func.lower(User.email) == email).first()
+    if user is not None:
+        token = create_password_reset_token(user.id, user.password_hash)
+        reset_url = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password?token={token}"
+        send_password_reset(user.email, user.first_name, reset_url)
+    return {"ok": True, "message": "Si el email está registrado, te enviamos un link para restablecer la contraseña."}
+
+
+@router.post("/reset-password", response_model=AuthResponse)
+def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+    decoded = decode_password_reset_token(payload.token)
+    if decoded is None:
+        raise HTTPException(status_code=400, detail="El link es inválido o expiró. Pedí uno nuevo.")
+    user_id, fp = decoded
+    user = db.get(User, user_id)
+    if user is None or _pw_fingerprint(user.password_hash) != fp:
+        # Wrong user, or the password already changed (link used / stale).
+        raise HTTPException(status_code=400, detail="El link ya fue usado o expiró. Pedí uno nuevo.")
+    user.password_hash = hash_password(payload.password)
+    db.commit()
+    db.refresh(user)
+    # Log them straight in so they don't have to retype the brand-new password.
     return AuthResponse(token=create_access_token(user.id), user=UserOut.model_validate(user))
 
 

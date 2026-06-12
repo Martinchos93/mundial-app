@@ -35,6 +35,13 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str = "admin@mundial2026.app"
     ADMIN_PASSWORD: str = "admin1234"
 
+    # Transactional email (Resend) for password recovery.
+    RESEND_API_KEY: str = ""  # set in Railway; empty = email disabled (dev)
+    RESEND_FROM: str = "ProdeGoat <no-reply@prodegoat.app>"
+    # Public URL of the frontend, used to build the reset link in emails.
+    FRONTEND_URL: str = "http://localhost:3000"
+    PASSWORD_RESET_EXPIRE_MINUTES: int = 30
+
     CORS_ORIGINS: str = "http://localhost:3000"
     # Regex fallback so the production domain + Vercel preview URLs are allowed
     # without having to enumerate every deploy URL. Override via env if needed.

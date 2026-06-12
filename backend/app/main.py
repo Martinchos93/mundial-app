@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -183,4 +184,7 @@ app.include_router(contact.admin_router)
 
 @app.get("/health", tags=["meta"])
 def health():
-    return {"status": "ok"}
+    # Railway injects the deployed commit SHA — expose it so we can verify which
+    # version is live without dashboard access.
+    commit = os.getenv("RAILWAY_GIT_COMMIT_SHA") or "dev"
+    return {"status": "ok", "commit": commit[:7]}

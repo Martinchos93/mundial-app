@@ -530,6 +530,7 @@ export interface BreakdownMatch {
   phase: string | null;
   kickoff_utc: string | null;
   points: Record<string, number>;
+  preds: Record<string, string>;
 }
 export interface GroupBreakdown {
   members: BreakdownMember[];

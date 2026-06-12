@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { useLeaderboard } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import MemberMatchesModal from "@/components/prode/MemberMatchesModal";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 const AV = [
@@ -14,6 +16,7 @@ const initials = (n: string) => n.trim().slice(0, 2).toUpperCase();
 
 export default function GroupLeaderboardCard({ groupId, userId }: { groupId: number; userId: number }) {
   const { data } = useLeaderboard(groupId);
+  const [sel, setSel] = useState<{ user_id: number; name: string } | null>(null);
   const entries = data ?? [];
   if (entries.length === 0) return null;
 
@@ -27,9 +30,10 @@ export default function GroupLeaderboardCard({ groupId, userId }: { groupId: num
         {entries.map((e, i) => {
           const isMe = e.user_id === userId;
           return (
-            <div
+            <button
               key={e.user_id}
-              className={cn("flex items-center gap-2.5 border-t border-gray-50 px-3.5 py-2", isMe && "bg-blue-50/60")}
+              onClick={() => setSel({ user_id: e.user_id, name: e.name })}
+              className={cn("flex w-full items-center gap-2.5 border-t border-gray-50 px-3.5 py-2 text-left transition-colors hover:bg-gray-50", isMe && "bg-blue-50/60")}
             >
               <span className="w-5 text-center text-[13px]">
                 {i < 3 ? MEDALS[i] : <span className="text-[12px] text-gray-400">{i + 1}</span>}
@@ -43,16 +47,21 @@ export default function GroupLeaderboardCard({ groupId, userId }: { groupId: num
               </span>
               {e.delta_today ? <span className="text-[11px] text-green-600">+{e.delta_today} hoy</span> : null}
               <span className="w-9 text-right text-[14px] font-semibold text-gray-900">{e.total_points}</span>
-            </div>
+            </button>
           );
         })}
       </div>
+      <p className="border-t border-gray-50 px-3.5 py-1.5 text-center text-[10px] text-gray-400">
+        Tocá un jugador para ver qué predijo en cada partido
+      </p>
       <Link
         href="/grupos"
         className="flex items-center justify-center gap-1 border-t border-gray-100 py-2 text-[12px] font-medium text-blue-600 hover:bg-gray-50"
       >
         Ver cuánto sumó cada uno por partido <ArrowRight className="h-3.5 w-3.5" />
       </Link>
+
+      {sel && <MemberMatchesModal groupId={groupId} member={sel} onClose={() => setSel(null)} />}
     </div>
   );
 }

@@ -119,7 +119,13 @@ def breakdown(group_id: int, db: Session = Depends(get_db)):
     col_ids = [c.id for c in db.query(Column).filter(Column.group_ids.any(group_id)).all()] or [-1]
 
     rows = (
-        db.query(Prediction.user_id, Prediction.match_id, Score.total)
+        db.query(
+            Prediction.user_id,
+            Prediction.match_id,
+            Score.total,
+            Prediction.pred_home_score,
+            Prediction.pred_away_score,
+        )
         .join(Score, Score.prediction_id == Prediction.id)
         .join(Match, Match.id == Prediction.match_id)
         .filter(
@@ -130,9 +136,11 @@ def breakdown(group_id: int, db: Session = Depends(get_db)):
         .all()
     )
     points: dict[int, dict[int, int]] = {}
-    for uid, mid, total in rows:
+    preds: dict[int, dict[int, str]] = {}
+    for uid, mid, total, ph, pa in rows:
         slot = points.setdefault(mid, {})
         slot[uid] = slot.get(uid, 0) + int(total or 0)
+        preds.setdefault(mid, {})[uid] = f"{ph}-{pa}"
 
     matches = (
         db.query(Match).filter(Match.id.in_(points.keys())).order_by(Match.kickoff_utc.desc()).all()
@@ -149,6 +157,7 @@ def breakdown(group_id: int, db: Session = Depends(get_db)):
             "phase": m.phase,
             "kickoff_utc": m.kickoff_utc.isoformat() if m.kickoff_utc else None,
             "points": points.get(m.id, {}),
+            "preds": preds.get(m.id, {}),
         }
         for m in matches
     ]

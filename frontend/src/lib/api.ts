@@ -897,6 +897,11 @@ export async function recalculateColumn(id: number): Promise<void> {
   await http.post(`/admin/columns/${id}/recalculate`);
 }
 
+export async function recalculateAll(): Promise<{ matches: number; recalculated_predictions: number }> {
+  const res = await http.post(`/admin/recalculate-all`);
+  return res.data;
+}
+
 // ---- Current user --------------------------------------------------------
 
 export interface MembershipInfo {

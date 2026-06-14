@@ -11,6 +11,7 @@ import {
   updateNews,
   deleteNews,
   syncSquads,
+  recalculateAll,
   useAdmins,
   createAdmin,
   revokeAdmin,
@@ -101,7 +102,7 @@ function AdminsManager() {
 }
 
 function TournamentTools() {
-  const [busy, setBusy] = useState<"squads" | null>(null);
+  const [busy, setBusy] = useState<"squads" | "recalc" | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
   async function squads() {
@@ -115,6 +116,19 @@ function TournamentTools() {
       );
     } catch {
       setMsg("No se pudieron sincronizar los planteles (límite de la API por minuto).");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function recalcAll() {
+    setBusy("recalc");
+    setMsg(null);
+    try {
+      const r = await recalculateAll();
+      setMsg(`✅ Recalculados ${r.recalculated_predictions} pronósticos en ${r.matches} partidos terminados.`);
+    } catch {
+      setMsg("No se pudo recalcular. Probá de nuevo.");
     } finally {
       setBusy(null);
     }
@@ -149,6 +163,13 @@ function TournamentTools() {
         className="mt-2 w-full rounded-lg border border-gray-200 bg-white py-2 text-[13px] text-gray-600 hover:bg-gray-50 disabled:opacity-60"
       >
         {busy === "squads" ? "Sincronizando planteles..." : "👥 Sincronizar planteles (API)"}
+      </button>
+      <button
+        onClick={recalcAll}
+        disabled={busy !== null}
+        className="mt-2 w-full rounded-lg border border-blue-200 bg-blue-50 py-2 text-[13px] font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-60"
+      >
+        {busy === "recalc" ? "Recalculando todos los partidos..." : "🔄 Recalcular TODO (re-puntuar partidos terminados)"}
       </button>
       {msg && <p className="mt-2 text-[11px] text-gray-500">{msg}</p>}
     </div>

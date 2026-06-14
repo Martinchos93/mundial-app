@@ -217,6 +217,18 @@ def recalculate(column_id: int, db: Session = Depends(get_db)):
     return {"column_id": column_id, "recalculated_predictions": count}
 
 
+@router.post("/recalculate-all")
+def recalculate_all(db: Session = Depends(get_db)):
+    """Re-score every finished match. Cheap and idempotent — useful after a
+    scoring-logic change (e.g. better name matching) to fix old results at once."""
+    matches = db.query(Match).filter(Match.status == "finished").all()
+    total = 0
+    for m in matches:
+        total += recalculate_match_scores(db, m)
+    db.commit()
+    return {"matches": len(matches), "recalculated_predictions": total}
+
+
 class MatchResultIn(BaseModel):
     home_score: int = Field(..., ge=0, le=30)
     away_score: int = Field(..., ge=0, le=30)

@@ -16,10 +16,12 @@ interface Props {
   /** Predicted scoreline — goals assigned to each team's players can't exceed it. */
   homeGoals?: number;
   awayGoals?: number;
-  /** Max players that can carry a yellow / a red (anti-gaming). Infinity = no cap. */
-  maxYellowPicks?: number;
-  maxRedPicks?: number;
+  /** Predicted match totals — yellow/red player picks can't exceed these (nor 3 per team). */
+  maxYellowsTotal?: number;
+  maxRedsTotal?: number;
 }
+
+const MAX_CARDS_PER_TEAM = 3;
 
 function MiniStepper({
   value,
@@ -75,24 +77,32 @@ export default function PlayerEventsTable({
   disabled,
   homeGoals = Infinity,
   awayGoals = Infinity,
-  maxYellowPicks = Infinity,
-  maxRedPicks = Infinity,
+  maxYellowsTotal = Infinity,
+  maxRedsTotal = Infinity,
 }: Props) {
   const { data: home } = useSquad(homeTeam || null);
   const { data: away } = useSquad(awayTeam || null);
 
-  const capped = [homeGoals, awayGoals, maxYellowPicks, maxRedPicks].some((n) => Number.isFinite(n));
+  const capped = [homeGoals, awayGoals, maxYellowsTotal, maxRedsTotal].some((n) => Number.isFinite(n));
   // Goals assigned per team — must not exceed that team's predicted score.
-  const homeGoalSum = Object.values(value)
-    .filter((e) => e.team === homeTeam)
-    .reduce((s, e) => s + (e.g ?? 0), 0);
-  const awayGoalSum = Object.values(value)
-    .filter((e) => e.team === awayTeam)
-    .reduce((s, e) => s + (e.g ?? 0), 0);
+  const homeGoalSum = Object.values(value).filter((e) => e.team === homeTeam).reduce((s, e) => s + (e.g ?? 0), 0);
+  const awayGoalSum = Object.values(value).filter((e) => e.team === awayTeam).reduce((s, e) => s + (e.g ?? 0), 0);
   const totalGoalSum = homeGoalSum + awayGoalSum;
   const totalGoals = (Number.isFinite(homeGoals) ? homeGoals : 0) + (Number.isFinite(awayGoals) ? awayGoals : 0);
-  const yellowUsed = Object.values(value).filter((e) => (e.y ?? 0) > 0).length;
-  const redUsed = Object.values(value).filter((e) => (e.r ?? 0) > 0).length;
+
+  // Yellow/red player picks: ≤ 3 per team AND ≤ the predicted match total.
+  const countCards = (team: string, field: "y" | "r") =>
+    Object.values(value).filter((e) => e.team === team && (e[field] ?? 0) > 0).length;
+  const homeYellowCount = countCards(homeTeam, "y");
+  const awayYellowCount = countCards(awayTeam, "y");
+  const totalYellowCount = homeYellowCount + awayYellowCount;
+  const homeRedCount = countCards(homeTeam, "r");
+  const awayRedCount = countCards(awayTeam, "r");
+  const totalRedCount = homeRedCount + awayRedCount;
+  // The per-team "3" only applies in user prediction mode (finite total). The
+  // admin form passes no totals (Infinity) → fully unlimited.
+  const yellowsPerTeamCap = Number.isFinite(maxYellowsTotal) ? MAX_CARDS_PER_TEAM : Infinity;
+  const redsPerTeamCap = Number.isFinite(maxRedsTotal) ? MAX_CARDS_PER_TEAM : Infinity;
 
   function setField(p: SquadPlayer, team: string, field: "g" | "y" | "r", v: number) {
     const cur = value[p.name] ?? { name: p.name, team, g: 0, y: 0, r: 0 };
@@ -103,6 +113,8 @@ export default function PlayerEventsTable({
     const teamGoals = team === homeTeam ? homeGoals : awayGoals;
     const teamGoalSum = team === homeTeam ? homeGoalSum : awayGoalSum;
     const teamGoalCap = Number.isFinite(teamGoals) ? teamGoals : Infinity;
+    const teamYellowCount = team === homeTeam ? homeYellowCount : awayYellowCount;
+    const teamRedCount = team === homeTeam ? homeRedCount : awayRedCount;
     return (
       <>
       <tr className="bg-gray-50">
@@ -125,8 +137,9 @@ export default function PlayerEventsTable({
         const touched = g || y || r;
         // No more goals than this team's predicted score (sum across its players).
         const goalAtCap = teamGoalSum >= teamGoalCap;
-        const yellowAtCap = y === 0 && yellowUsed >= maxYellowPicks;
-        const redAtCap = r === 0 && redUsed >= maxRedPicks;
+        // Yellow/red picks: ≤ 3 per team and ≤ the predicted match total.
+        const yellowAtCap = y === 0 && (teamYellowCount >= yellowsPerTeamCap || totalYellowCount >= maxYellowsTotal);
+        const redAtCap = r === 0 && (teamRedCount >= redsPerTeamCap || totalRedCount >= maxRedsTotal);
         return (
           <tr key={p.id} className={cn("border-t border-gray-50", touched && "bg-blue-50/30")}>
             <td className="px-2.5 py-1.5">
@@ -156,8 +169,8 @@ export default function PlayerEventsTable({
       {capped && (
         <div className="mb-1 flex items-center justify-end gap-2 text-[10px] text-gray-400">
           <span className={cn(totalGoalSum >= totalGoals && totalGoals > 0 && "font-semibold text-blue-600")}>⚽ {totalGoalSum}/{totalGoals}</span>
-          <span className={cn(yellowUsed >= maxYellowPicks && "font-semibold text-amber-500")}>🟨 {yellowUsed}/{maxYellowPicks}</span>
-          <span className={cn(redUsed >= maxRedPicks && "font-semibold text-red-500")}>🟥 {redUsed}/{maxRedPicks}</span>
+          <span className={cn(totalYellowCount >= maxYellowsTotal && maxYellowsTotal > 0 && "font-semibold text-amber-500")}>🟨 {totalYellowCount}/{Number.isFinite(maxYellowsTotal) ? maxYellowsTotal : "∞"}</span>
+          <span className={cn(totalRedCount >= maxRedsTotal && maxRedsTotal > 0 && "font-semibold text-red-500")}>🟥 {totalRedCount}/{Number.isFinite(maxRedsTotal) ? maxRedsTotal : "∞"}</span>
         </div>
       )}
       <div className="max-h-72 overflow-y-auto rounded-lg border border-gray-100">

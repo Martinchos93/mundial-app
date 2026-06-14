@@ -13,6 +13,8 @@ helper (`score_prediction`) adapts ORM objects to it.
 """
 from __future__ import annotations
 
+import re
+import unicodedata
 from dataclasses import dataclass, asdict
 from typing import Any
 
@@ -52,31 +54,46 @@ class ScoreBreakdown:
         return asdict(self)
 
 
-def _norm(name: str) -> str:
-    return (name or "").strip().casefold()
+# Tokens that carry no identity, so they shouldn't block a match.
+_NAME_STOP = {"jr", "junior", "de", "da", "do", "dos", "das", "del", "la", "el"}
+
+
+def _name_tokens(name: str) -> frozenset[str]:
+    """Accent-stripped, punctuation-split token set of a player name. Lets
+    'Vinícius Júnior' (our squad) match 'Vinicius' (promiedos) and
+    'B. Guimaraes' match 'Bruno Guimaraes'."""
+    s = unicodedata.normalize("NFKD", name or "")
+    s = "".join(c for c in s if not unicodedata.combining(c)).casefold()
+    s = re.sub(r"[.\-_'`]", " ", s)
+    return frozenset(t for t in s.split() if t and t not in _NAME_STOP)
+
+
+def _name_match(a: str, b: str) -> bool:
+    """True if two names refer to the same player: same token set, or one is a
+    subset of the other (short name vs full name)."""
+    ta, tb = _name_tokens(a), _name_tokens(b)
+    if not ta or not tb:
+        return False
+    return ta <= tb or tb <= ta
+
+
+def _match_count(name: str, actuals) -> int:
+    """How many of `actuals` match `name` (counts a brace as 2)."""
+    return sum(1 for a in (actuals or []) if _name_match(name, a))
 
 
 def _count_hits(picks, actuals) -> int:
     """Number of distinct picks (capped at MAX_PICKS) that appear in actuals."""
-    actual_set = {_norm(a) for a in (actuals or [])}
-    seen: set[str] = set()
+    seen: list[frozenset[str]] = []
     hits = 0
     for p in (picks or [])[:MAX_PICKS]:
-        key = _norm(p)
-        if key and key not in seen:
-            seen.add(key)
-            if key in actual_set:
-                hits += 1
+        toks = _name_tokens(p)
+        if not toks or toks in seen:
+            continue
+        seen.append(toks)
+        if any(_name_match(p, a) for a in (actuals or [])):
+            hits += 1
     return hits
-
-
-def _counter(names) -> dict[str, int]:
-    out: dict[str, int] = {}
-    for n in names or []:
-        k = _norm(n)
-        if k:
-            out[k] = out.get(k, 0) + 1
-    return out
 
 
 def _score_players(
@@ -93,15 +110,16 @@ def _score_players(
     Caps per match: up to MAX_GOAL_PICKS goal picks, MAX_YELLOW_PICKS yellow
     picks and MAX_RED_PICKS red picks count, to limit gaming.
     """
-    goals_actual = _counter(actual_scorers)
-    red_set = {_norm(n) for n in (actual_reds or [])}
-    yellow_set = {_norm(n) for n in (actual_booked or [])} - red_set
+    # A red-carded player isn't double-counted as a yellow.
+    booked = list(actual_booked or [])
+    reds = list(actual_reds or [])
+    yellows = [n for n in booked if not any(_name_match(n, rp) for rp in reds)]
 
     goal_pts = card_pts = 0
     goal_used = yellow_used = red_used = 0
     for p in pred_players or []:
-        name = _norm(p.get("name", ""))
-        if not name:
+        name = p.get("name", "")
+        if not _name_tokens(name):
             continue
         g = int(p.get("g", 0) or 0)
         y = int(p.get("y", 0) or 0)
@@ -109,16 +127,16 @@ def _score_players(
 
         if g > 0 and goal_used < MAX_GOAL_PICKS:
             goal_used += 1
-            goal_pts += min(g, goals_actual.get(name, 0)) * int(cfg["pts_scorer"])
+            goal_pts += min(g, _match_count(name, actual_scorers)) * int(cfg["pts_scorer"])
 
         if r > 0 and red_used < MAX_RED_PICKS:
             red_used += 1
-            if name in red_set:
+            if any(_name_match(name, rp) for rp in reds):
                 card_pts += int(cfg["pts_card_red"])
 
         if y > 0 and yellow_used < MAX_YELLOW_PICKS:
             yellow_used += 1
-            if name in yellow_set:
+            if any(_name_match(name, yp) for yp in yellows):
                 card_pts += int(cfg["pts_card"])
     return goal_pts, card_pts
 

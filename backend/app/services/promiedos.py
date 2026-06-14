@@ -145,7 +145,45 @@ def _fetch_game_detail(slug: str, gid: str) -> dict | None:
                     booked.append(name)
                 elif e.get("type") == _EV_RED:
                     sent_off.append(name)
-    return {"yellows": yellows, "booked": booked, "sent_off": sent_off}
+
+    # Lineups (formation + starting XI + subs), oriented by team_num (1 = teams[0]).
+    lineups: list[dict | None] = [None, None]
+    for t in ((obj.get("players") or {}).get("lineups") or {}).get("teams") or []:
+        idx = 0 if t.get("team_num") == 1 else 1 if t.get("team_num") == 2 else None
+        if idx is None:
+            continue
+        num_to_name = {
+            p.get("jersey_num"): p.get("name")
+            for p in (t.get("starting") or []) + (t.get("bench") or [])
+        }
+        starting = [
+            {
+                "name": p.get("name"),
+                "num": p.get("jersey_num"),
+                "pos": p.get("position"),
+                "captain": bool(p.get("is_captain")),
+            }
+            for p in t.get("starting") or []
+        ]
+        subs = []
+        for p in t.get("bench") or []:
+            sub = p.get("substitution") or {}
+            if sub.get("time") is not None and sub.get("player") is not None:
+                subs.append(
+                    {"in": p.get("name"), "out": num_to_name.get(sub.get("player")), "minute": _int(sub.get("time"))}
+                )
+        subs.sort(key=lambda s: s.get("minute") or 0)
+        if starting:
+            lineups[idx] = {"formation": t.get("formation"), "starting": starting, "subs": subs}
+
+    return {"yellows": yellows, "booked": booked, "sent_off": sent_off, "lineups": lineups}
+
+
+def _oriented_lineups(detail: dict, home_is_n0: bool) -> dict | None:
+    """Map the promiedos-ordered [team0, team1] lineups to our home/away."""
+    lu = detail.get("lineups") or [None, None]
+    home, away = (lu[0], lu[1]) if home_is_n0 else (lu[1], lu[0])
+    return {"home": home, "away": away} if (home or away) else None
 
 
 def fetch_and_apply(db: Session) -> dict:
@@ -206,20 +244,27 @@ def fetch_and_apply(db: Session) -> dict:
             if not m.scorers and (hg or ag) and m.home_score == hs and m.away_score == as_:
                 m.scorers = (hg + ag) or None
                 changed_fin = True
-            # Yellows only when we never captured any (0-0), so we don't clobber a
-            # value already scraped or hand-edited.
-            if (m.home_yellows or 0) == 0 and (m.away_yellows or 0) == 0:
+            # Fetch the detail page if we're missing yellows (never captured) or
+            # lineups — fills late bookings and backfills formations for old games.
+            need_yellows = (m.home_yellows or 0) == 0 and (m.away_yellows or 0) == 0
+            need_lineups = not m.lineups
+            if need_yellows or need_lineups:
                 slug, gid = g.get("url_name"), g.get("id")
                 detail = _fetch_game_detail(str(slug), str(gid)) if (slug and gid) else None
                 if detail:
-                    y0, y1 = detail["yellows"]
-                    hy, ay = (y0, y1) if m.home_team == n0 else (y1, y0)
-                    if (hy or 0) > 0 or (ay or 0) > 0:
-                        m.home_yellows, m.away_yellows = hy or 0, ay or 0
-                        m.booked = detail["booked"] or None
-                        if detail["sent_off"]:
-                            m.red_players = detail["sent_off"]
-                        changed_fin = True
+                    if need_yellows:
+                        y0, y1 = detail["yellows"]
+                        hy, ay = (y0, y1) if m.home_team == n0 else (y1, y0)
+                        if (hy or 0) > 0 or (ay or 0) > 0:
+                            m.home_yellows, m.away_yellows = hy or 0, ay or 0
+                            m.booked = detail["booked"] or None
+                            if detail["sent_off"]:
+                                m.red_players = detail["sent_off"]
+                            changed_fin = True
+                    if need_lineups:
+                        ol = _oriented_lineups(detail, m.home_team == n0)
+                        if ol:
+                            m.lineups = ol  # committed by the final db.commit()
             if changed_fin:
                 db.flush()
                 recalculate_match_scores(db, m)
@@ -258,6 +303,9 @@ def fetch_and_apply(db: Session) -> dict:
                 m.booked = detail["booked"] or None  # combined names; scoring matches by name
                 if detail["sent_off"]:
                     m.red_players = detail["sent_off"]
+                ol = _oriented_lineups(detail, m.home_team == n0)
+                if ol:
+                    m.lineups = ol
 
         # One-time visibility into the live structure (helps verify score field).
         if (g.get("status") or {}).get("enum") not in (1, None):

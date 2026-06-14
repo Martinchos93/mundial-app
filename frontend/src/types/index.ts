@@ -108,6 +108,28 @@ export interface Match {
   red_players?: string[];
   ai_prediction?: AIPrediction | null;
   events?: MatchEvent[];
+  lineups?: MatchLineups | null;
+}
+
+export interface LineupStarter {
+  name: string;
+  num: number | null;
+  pos: string | null;
+  captain: boolean;
+}
+export interface LineupSub {
+  in: string;
+  out: string | null;
+  minute: number | null;
+}
+export interface SideLineup {
+  formation: string | null;
+  starting: LineupStarter[];
+  subs: LineupSub[];
+}
+export interface MatchLineups {
+  home: SideLineup | null;
+  away: SideLineup | null;
 }
 
 export interface User {

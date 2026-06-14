@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft, MapPin } from "lucide-react";
 import { useMatch, usePredictions, useAIPrediction, useActiveColumnId, useSettings } from "@/lib/api";
 import LiveStats from "@/components/match/LiveStats";
+import Lineups from "@/components/match/Lineups";
 import AIPredictionCard from "@/components/match/AIPredictionCard";
 import PredictionForm from "@/components/prode/PredictionForm";
 import { formatFullDate } from "@/lib/utils";
@@ -138,6 +139,13 @@ export default function MatchDetailPage({ params }: { params: { id: string } }) 
             {(match.status === "live" || match.status === "finished") && (
               <Section title="Estadísticas">
                 <LiveStats match={match} />
+              </Section>
+            )}
+
+            {/* Lineups */}
+            {match.lineups && (match.lineups.home || match.lineups.away) && (
+              <Section title="Formaciones">
+                <Lineups match={match} />
               </Section>
             )}
 

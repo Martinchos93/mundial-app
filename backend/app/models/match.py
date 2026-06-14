@@ -56,6 +56,8 @@ class Match(Base):
     away_shots: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     raw_stats: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # {"home": {formation, starting:[{name,num,pos,captain}], subs:[{in,out,minute}]}, "away": {...}}
+    lineups: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

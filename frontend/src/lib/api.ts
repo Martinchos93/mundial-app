@@ -74,6 +74,7 @@ interface BackendMatch {
   scorers: string[] | null;
   booked: string[] | null;
   red_players: string[] | null;
+  lineups: import("@/types").MatchLineups | null;
 }
 
 function adaptMatch(m: BackendMatch): Match {
@@ -107,6 +108,7 @@ function adaptMatch(m: BackendMatch): Match {
     scorers: m.scorers ?? [],
     booked: m.booked ?? [],
     red_players: m.red_players ?? [],
+    lineups: m.lineups ?? null,
     ai_prediction: null,
     events: [],
   };

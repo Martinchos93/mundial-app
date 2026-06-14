@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Minus, Plus, Check, ChevronDown } from "lucide-react";
 import type { Match, Prediction, AIResult, PlayerEvent } from "@/types";
 import { cn, isLockExpired, getToken } from "@/lib/utils";
+import { playerNameMatch } from "@/lib/playerName";
 import { submitPrediction, useSettings, useMe } from "@/lib/api";
 import PlayerEventsTable, { type EventMap } from "@/components/prode/PlayerEventsTable";
 
@@ -158,7 +159,7 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
       h == null || a == null ? "—" : h > a ? `gana ${homeName}` : h < a ? `gana ${awayName}` : "empate";
     const predScorers = (existing.pred_players ?? []).filter((p) => p.g);
     const scorersHit = predScorers.filter(
-      (p) => scorers.filter((n) => n === p.name).length >= (p.g ?? 1),
+      (p) => scorers.filter((n) => playerNameMatch(n, p.name)).length >= (p.g ?? 1),
     );
 
     const rows: { icon: string; label: string; detail: string; pts: number }[] = [

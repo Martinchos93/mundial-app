@@ -4,6 +4,7 @@ import { useState } from "react";
 import { X, ChevronDown } from "lucide-react";
 import { useBreakdown, type BreakdownComp } from "@/lib/api";
 import { flagFor } from "@/lib/flags";
+import { playerNameMatch } from "@/lib/playerName";
 import { cn } from "@/lib/utils";
 
 function DetailRow({ icon, label, detail, pts }: { icon: string; label: string; detail: string; pts: number }) {
@@ -58,7 +59,7 @@ function buildDetail(r: Row): { icon: string; label: string; detail: string; pts
           ? `gana ${r.away_team}`
           : "empate";
   const scorerHits = (c.pred_scorers ?? []).map(
-    (name) => `${name}${r.scorers.includes(name) ? " ✅" : " ❌"}`,
+    (name) => `${name}${r.scorers.some((n) => playerNameMatch(n, name)) ? " ✅" : " ❌"}`,
   );
 
   const rows = [

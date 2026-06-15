@@ -12,6 +12,7 @@ import {
   deleteNews,
   syncSquads,
   recalculateAll,
+  backfillPicks,
   useAdmins,
   createAdmin,
   revokeAdmin,
@@ -103,7 +104,7 @@ function AdminsManager() {
 }
 
 function TournamentTools() {
-  const [busy, setBusy] = useState<"squads" | "recalc" | null>(null);
+  const [busy, setBusy] = useState<"squads" | "recalc" | "backfill" | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
   async function squads() {
@@ -130,6 +131,19 @@ function TournamentTools() {
       setMsg(`✅ Recalculados ${r.recalculated_predictions} pronósticos en ${r.matches} partidos terminados.`);
     } catch {
       setMsg("No se pudo recalcular. Probá de nuevo.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function backfill() {
+    setBusy("backfill");
+    setMsg(null);
+    try {
+      const r = await backfillPicks();
+      setMsg(`✅ Goleador/campeón copiados a prodes vacíos: ${r.top_scorer_filled} goleadores y ${r.champion_filled} campeones (${r.users} usuarios revisados).`);
+    } catch {
+      setMsg("No se pudo hacer el backfill. Probá de nuevo.");
     } finally {
       setBusy(null);
     }
@@ -171,6 +185,13 @@ function TournamentTools() {
         className="mt-2 w-full rounded-lg border border-blue-200 bg-blue-50 py-2 text-[13px] font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-60"
       >
         {busy === "recalc" ? "Recalculando todos los partidos..." : "🔄 Recalcular TODO (re-puntuar partidos terminados)"}
+      </button>
+      <button
+        onClick={backfill}
+        disabled={busy !== null}
+        className="mt-2 w-full rounded-lg border border-violet-200 bg-violet-50 py-2 text-[13px] font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-60"
+      >
+        {busy === "backfill" ? "Copiando goleador/campeón..." : "🎯 Copiar goleador/campeón a prodes vacíos"}
       </button>
       {msg && <p className="mt-2 text-[11px] text-gray-500">{msg}</p>}
     </div>

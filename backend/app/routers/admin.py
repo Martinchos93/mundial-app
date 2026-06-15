@@ -6,13 +6,17 @@ from pydantic import BaseModel, Field, EmailStr
 
 from app.database import get_db
 from app.deps import get_current_admin
-from app.models import Column, Match, Prediction, Score, User, Group, AIPrediction, Membership
+from app.models import (
+    Column, Match, Prediction, Score, User, Group, AIPrediction, Membership,
+    TopScorerPrediction, ChampionPrediction,
+)
 from app.models.column import DEFAULT_SCORING_CONFIG
 from app.schemas.column import ColumnCreate, ColumnUpdate, ColumnOut, ColumnStats
 from app.schemas.auth import UserOut
 from app.schemas.prediction import PlayerEvent
 from app.security import hash_password
 from app.services.sync import recalculate_column, recalculate_match_scores
+from app.routers.predictions import _user_active_columns
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(get_current_admin)])
 
@@ -215,6 +219,42 @@ def recalculate(column_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Column not found")
     count = recalculate_column(db, col)
     return {"column_id": column_id, "recalculated_predictions": count}
+
+
+@router.post("/backfill-picks")
+def backfill_picks(db: Session = Depends(get_db)):
+    """Copy each user's top-scorer + champion pick into their prodes that have
+    none yet (e.g. prodes joined after picking). Never overwrites an existing
+    pick. Bypasses the matchday-1 lock since it only FILLS gaps, not changes."""
+    ts = 0
+    ch = 0
+    user_ids = {u for (u,) in db.query(TopScorerPrediction.user_id).distinct()} | {
+        u for (u,) in db.query(ChampionPrediction.user_id).distinct()
+    }
+    for uid in user_ids:
+        active_cols = [c.id for c in _user_active_columns(db, uid)]
+        if not active_cols:
+            continue
+        # top scorer
+        picks = db.query(TopScorerPrediction).filter(TopScorerPrediction.user_id == uid).all()
+        if picks:
+            src = picks[-1]
+            have = {p.column_id for p in picks}
+            for cid in active_cols:
+                if cid not in have:
+                    db.add(TopScorerPrediction(user_id=uid, column_id=cid, player_name=src.player_name, team_name=src.team_name))
+                    ts += 1
+        # champion
+        cpicks = db.query(ChampionPrediction).filter(ChampionPrediction.user_id == uid).all()
+        if cpicks:
+            src = cpicks[-1]
+            have = {p.column_id for p in cpicks}
+            for cid in active_cols:
+                if cid not in have:
+                    db.add(ChampionPrediction(user_id=uid, column_id=cid, team_name=src.team_name))
+                    ch += 1
+    db.commit()
+    return {"top_scorer_filled": ts, "champion_filled": ch, "users": len(user_ids)}
 
 
 @router.post("/recalculate-all")

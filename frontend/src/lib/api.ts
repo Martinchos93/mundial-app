@@ -980,6 +980,11 @@ export async function recalculateAll(): Promise<{ matches: number; recalculated_
   return res.data;
 }
 
+export async function backfillPicks(): Promise<{ top_scorer_filled: number; champion_filled: number; users: number }> {
+  const res = await http.post(`/admin/backfill-picks`);
+  return res.data;
+}
+
 // ---- Current user --------------------------------------------------------
 
 export interface MembershipInfo {

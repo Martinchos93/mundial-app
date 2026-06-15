@@ -306,9 +306,9 @@ def matchday1_deadline(db: Session) -> datetime | None:
 
 
 def is_topscorer_locked(db: Session) -> bool:
-    """Top-scorer pick locks once matchday 1 has fully kicked off."""
-    d = matchday1_deadline(db)
-    return bool(d and datetime.now(timezone.utc) >= d)
+    """Top-scorer + champion picks stay editable (no matchday-1 lock) so people
+    can set/fix them — and apply them to all their prodes — at any time."""
+    return False
 
 
 def tournament_champion(db: Session) -> str | None:

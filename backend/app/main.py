@@ -27,6 +27,7 @@ from app.routers import (
     media,
     settings as settings_router,
     contact,
+    futgolf,
 )
 from app.tasks.scheduler import start_scheduler, stop_scheduler
 
@@ -171,6 +172,7 @@ app.add_middleware(
 for r in (auth, matches, teams, players, predictions, groups, leaderboard, ai, admin, standings, stats):
     app.include_router(r.router)
 app.include_router(leaderboard.global_router)
+app.include_router(futgolf.router)
 app.include_router(news.router)
 app.include_router(news.admin_router)
 app.include_router(bracket.router)

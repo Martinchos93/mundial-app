@@ -693,6 +693,8 @@ export async function submitChampion(
 export interface AppSettings {
   ai_enabled: boolean;
   live_scraping_enabled: boolean;
+  futgolf_enabled: boolean;
+  futgolf_allowed: number[];
 }
 
 export async function liveSyncNow(): Promise<{ enabled: boolean; updated?: number; games?: number }> {
@@ -709,6 +711,48 @@ export function useSettings() {
 export async function setSetting(key: string, value: unknown): Promise<AppSettings> {
   const res = await http.put(`/admin/settings`, { key, value });
   return res.data as AppSettings;
+}
+
+// ---- FutGolf -----------------------------------------------------------
+export interface FutgolfParticipant {
+  user_id: number; name: string; avatar_emoji: string;
+  status: "active" | "eliminated" | "winner"; submitted: boolean;
+}
+export interface FutgolfTable {
+  id: number; group_id: number; name: string;
+  status: "lobby" | "playing" | "finished";
+  round_no: number; shots_allowed: number; course_seed: number;
+  winner_user_id: number | null; created_by: number;
+  participants: FutgolfParticipant[];
+  active_count: number;
+  my_status: string | null; my_turn: boolean; pending: number[];
+}
+
+export function useFutgolfTables(groupId: number | null) {
+  return useSWR<FutgolfTable[]>(
+    groupId ? `/futgolf/tables?group_id=${groupId}` : null,
+    (url: string) => http.get(url).then((r) => r.data as FutgolfTable[]),
+    { refreshInterval: 15000 },
+  );
+}
+export function useFutgolfTable(tableId: number | null) {
+  return useSWR<FutgolfTable>(
+    tableId ? `/futgolf/tables/${tableId}` : null,
+    (url: string) => http.get(url).then((r) => r.data as FutgolfTable),
+    { refreshInterval: 8000 },
+  );
+}
+export async function createFutgolfTable(groupId: number, name: string, memberIds: number[]): Promise<FutgolfTable> {
+  const res = await http.post(`/futgolf/tables`, { group_id: groupId, name, member_user_ids: memberIds });
+  return res.data as FutgolfTable;
+}
+export async function startFutgolfTable(tableId: number): Promise<FutgolfTable> {
+  const res = await http.post(`/futgolf/tables/${tableId}/start`);
+  return res.data as FutgolfTable;
+}
+export async function submitFutgolfResult(tableId: number, sunk: boolean, shots: number): Promise<FutgolfTable> {
+  const res = await http.post(`/futgolf/tables/${tableId}/submit`, { sunk, shots });
+  return res.data as FutgolfTable;
 }
 
 // ---- Contact -----------------------------------------------------------

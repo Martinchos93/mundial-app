@@ -3,13 +3,15 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { cn, isAdmin } from "@/lib/utils";
+import { cn, isAdmin, getUserId } from "@/lib/utils";
+import { useSettings } from "@/lib/api";
 
 interface Tab {
   href: string;
   label: string;
   icon: string;
   adminOnly?: boolean;
+  futgolfOnly?: boolean;
 }
 
 const TABS: Tab[] = [
@@ -18,12 +20,14 @@ const TABS: Tab[] = [
   { href: "/prode", label: "Prode", icon: "🏆" },
   { href: "/grupos", label: "Grupos", icon: "👥" },
   { href: "/teams", label: "WC", icon: "📊" },
+  { href: "/futgolf", label: "FutGolf", icon: "⛳", futgolfOnly: true },
   { href: "/admin", label: "Admin", icon: "⚙️", adminOnly: true },
 ];
 
 export default function Navbar() {
   const pathname = usePathname();
   const [admin, setAdmin] = useState(false);
+  const { data: settings } = useSettings();
 
   // Read admin status after mount (localStorage is client-only); re-check on
   // navigation so it updates right after login/logout.
@@ -31,7 +35,9 @@ export default function Navbar() {
     setAdmin(isAdmin());
   }, [pathname]);
 
-  const tabs = TABS.filter((t) => !t.adminOnly || admin);
+  const myId = Number(getUserId()) || 0;
+  const futgolfOk = !!settings?.futgolf_enabled && (admin || (settings?.futgolf_allowed ?? []).includes(myId));
+  const tabs = TABS.filter((t) => (!t.adminOnly || admin) && (!t.futgolfOnly || futgolfOk));
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white">

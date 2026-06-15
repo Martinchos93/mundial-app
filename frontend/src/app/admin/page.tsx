@@ -491,6 +491,59 @@ function Toggle({ on, onClick, disabled }: { on: boolean; onClick: () => void; d
   );
 }
 
+function FutgolfManager() {
+  const { data, mutate } = useSettings();
+  const enabled = data?.futgolf_enabled ?? false;
+  const allowed = data?.futgolf_allowed ?? [];
+  const [q, setQ] = useState("");
+  const { data: users } = useAdminUsers(q, 1, 8);
+  const [busy, setBusy] = useState(false);
+
+  async function toggleEnabled() {
+    setBusy(true);
+    try { await setSetting("futgolf_enabled", !enabled); await mutate(); } finally { setBusy(false); }
+  }
+  async function toggleUser(id: number) {
+    const next = allowed.includes(id) ? allowed.filter((x) => x !== id) : [...allowed, id];
+    await setSetting("futgolf_allowed", next); await mutate();
+  }
+
+  return (
+    <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3.5">
+      <div className="mb-2.5 text-[13px] font-medium text-gray-900">⛳ FutGolf (juego)</div>
+      <div className="flex items-center justify-between border-b border-gray-50 pb-3">
+        <div className="pr-3">
+          <div className="text-[13px] text-gray-800">Habilitar sección</div>
+          <p className="text-[11px] text-gray-400">Muestra la pestaña ⛳ FutGolf solo a los integrantes habilitados abajo (y admins).</p>
+        </div>
+        <Toggle on={enabled} onClick={toggleEnabled} disabled={busy} />
+      </div>
+
+      <p className="mb-1.5 mt-3 text-[11px] text-gray-400">Integrantes habilitados ({allowed.length}). Buscá y tocá para habilitar/quitar:</p>
+      <div className="relative mb-2">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar usuario…"
+          className="w-full rounded-lg border border-gray-200 py-2 pl-8 pr-3 text-[13px] focus:border-blue-400 focus:outline-none" />
+      </div>
+      <div className="space-y-1">
+        {users?.items.map((u) => {
+          const on = allowed.includes(u.id);
+          return (
+            <button key={u.id} onClick={() => toggleUser(u.id)}
+              className={cn("flex w-full items-center justify-between rounded-lg border px-2.5 py-1.5 text-left text-[12.5px]",
+                on ? "border-green-300 bg-green-50" : "border-gray-200")}>
+              <span className="truncate text-gray-700">{u.first_name} {u.last_name} <span className="text-gray-400">@{u.username}</span></span>
+              <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", on ? "bg-green-100 text-green-600" : "bg-gray-100 text-gray-400")}>
+                {on ? "✓ habilitado" : "habilitar"}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function SettingsManager() {
   const { data, mutate } = useSettings();
   const [busy, setBusy] = useState<string | null>(null);
@@ -871,6 +924,7 @@ export default function AdminPage() {
         <ActiveUsersCard />
         <ContactManager />
         <SettingsManager />
+        <FutgolfManager />
         <ResultsManager />
         <UsersTable />
         <AdminsManager />

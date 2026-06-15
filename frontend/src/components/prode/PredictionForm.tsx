@@ -308,9 +308,11 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
           <div className="mb-1 text-[11px] text-gray-400">{homeName}</div>
           <input
             type="number"
+            inputMode="numeric"
             min={0}
             value={home}
             disabled={locked}
+            onFocus={(e) => e.currentTarget.select()}
             onChange={(e) => setHome(clampScore(e.target.value))}
             className="h-14 w-14 rounded-xl border border-gray-200 bg-gray-50 text-center text-[22px] font-semibold text-gray-900 focus:border-blue-400 focus:outline-none disabled:text-gray-400"
           />
@@ -320,9 +322,11 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
           <div className="mb-1 text-[11px] text-gray-400">{awayName}</div>
           <input
             type="number"
+            inputMode="numeric"
             min={0}
             value={away}
             disabled={locked}
+            onFocus={(e) => e.currentTarget.select()}
             onChange={(e) => setAway(clampScore(e.target.value))}
             className="h-14 w-14 rounded-xl border border-gray-200 bg-gray-50 text-center text-[22px] font-semibold text-gray-900 focus:border-blue-400 focus:outline-none disabled:text-gray-400"
           />

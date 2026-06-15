@@ -740,7 +740,7 @@ export function useFutgolfTable(tableId: number | null) {
   return useSWR<FutgolfTable>(
     tableId ? `/futgolf/tables/${tableId}` : null,
     (url: string) => http.get(url).then((r) => r.data as FutgolfTable),
-    { refreshInterval: 8000 },
+    { refreshInterval: 6000, revalidateOnFocus: true },
   );
 }
 export async function createFutgolfTable(groupId: number, name: string, memberIds: number[]): Promise<FutgolfTable> {

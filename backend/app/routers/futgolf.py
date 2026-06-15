@@ -98,9 +98,11 @@ def create_table(payload: CreateTable, user: User = Depends(require_futgolf), db
     ids = {user.id} | {uid for uid in payload.member_user_ids if uid in members}
     if len(ids) < 2:
         raise HTTPException(status_code=400, detail="Elegí al menos un rival del prode.")
+    # Start playing immediately — the roster is fixed at creation, so a separate
+    # "lobby" step only blocked invitees from seeing the play button.
     t = FutgolfTable(
         group_id=payload.group_id, name=payload.name.strip(), created_by=user.id,
-        status="lobby", course_seed=random.randint(1, 9_000_000), round_no=0, shots_allowed=3,
+        status="playing", course_seed=random.randint(1, 9_000_000), round_no=1, shots_allowed=3,
     )
     db.add(t); db.flush()
     for uid in ids:

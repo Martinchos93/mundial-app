@@ -5,13 +5,14 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { ArrowLeft, Plus, Trophy } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
+import ProdeSwitcher from "@/components/prode/ProdeSwitcher";
 import {
   useSettings, useMembers,
   useFutgolfTables, useFutgolfTable,
   createFutgolfTable, startFutgolfTable, submitFutgolfResult, trackFutgolfView,
   type FutgolfTable,
 } from "@/lib/api";
-import { getSelectedGroupId, getUserId, isAdmin, cn } from "@/lib/utils";
+import { getSelectedGroupId, setSelectedGroupId, getUserId, isAdmin, cn } from "@/lib/utils";
 import type { Member } from "@/types";
 
 const FutgolfGame = dynamic(() => import("@/components/futgolf/FutgolfGame"), {
@@ -164,10 +165,16 @@ function TableView({ tableId, onBack }: { tableId: number; onBack: () => void })
 
 export default function FutgolfPage() {
   const { data: settings } = useSettings();
-  const groupId = Number(getSelectedGroupId()) || null;
+  const [groupId, setGroupId] = useState<number | null>(() => Number(getSelectedGroupId()) || null);
+  const [sel, setSel] = useState<number | null>(null);
   const { data: members } = useMembers(groupId);
   const { data: tables, mutate } = useFutgolfTables(groupId);
-  const [sel, setSel] = useState<number | null>(null);
+
+  function switchProde(id: number) {
+    setGroupId(id);
+    setSelectedGroupId(id);
+    setSel(null);
+  }
 
   const myId = Number(getUserId()) || 0;
   const allowed = settings
@@ -182,6 +189,8 @@ export default function FutgolfPage() {
     <>
       <Header />
       <main className="px-4 pb-24 pt-3">
+        {allowed && <ProdeSwitcher value={groupId} onChange={switchProde} className="mb-3" />}
+
         {allowed === false && (
           <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
             <div className="text-3xl">🔒</div>

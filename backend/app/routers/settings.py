@@ -14,6 +14,7 @@ DEFAULTS: dict[str, Any] = {
     "ai_enabled": False,  # show the "Generar con IA" prediction option
     "live_scraping_enabled": False,  # auto-update live scores from promiedos
     "futgolf_enabled": False,  # show the FutGolf game section
+    "futgolf_all": False,  # if true, FutGolf is open to everyone (not just the allow-list)
     "futgolf_allowed": [],  # user_ids allowed into FutGolf (admins always allowed)
 }
 

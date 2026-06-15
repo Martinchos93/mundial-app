@@ -9,13 +9,14 @@ import random
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, get_current_admin
 from app.models import (
     User, Group, Membership, Setting,
-    FutgolfTable, FutgolfParticipant, FutgolfAttempt,
+    FutgolfTable, FutgolfParticipant, FutgolfAttempt, FutgolfView,
 )
 
 router = APIRouter(prefix="/futgolf", tags=["futgolf"])
@@ -29,6 +30,8 @@ def _setting(db: Session, key: str, default):
 def require_futgolf(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> User:
     if not _setting(db, "futgolf_enabled", False):
         raise HTTPException(status_code=403, detail="FutGolf no está habilitado.")
+    if _setting(db, "futgolf_all", False):
+        return current_user  # abierto a todos
     allowed = _setting(db, "futgolf_allowed", []) or []
     if not current_user.is_admin and current_user.id not in allowed:
         raise HTTPException(status_code=403, detail="No estás habilitado para FutGolf.")
@@ -201,3 +204,38 @@ def _resolve_if_complete(db: Session, t: FutgolfTable) -> None:
     else:
         t.round_no += 1
         t.shots_allowed = 3
+
+
+@router.post("/view")
+def track_view(user: User = Depends(require_futgolf), db: Session = Depends(get_db)):
+    """Records that this user opened the section (adoption metric, 1 row/user)."""
+    v = db.get(FutgolfView, user.id)
+    if v is None:
+        db.add(FutgolfView(user_id=user.id, opens=1))
+    else:
+        v.opens += 1
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/stats", dependencies=[Depends(get_current_admin)])
+def futgolf_stats(db: Session = Depends(get_db)):
+    """Adoption stats for the admin dashboard."""
+    openers = db.query(func.count(FutgolfView.user_id)).scalar() or 0
+    total_opens = int(db.query(func.coalesce(func.sum(FutgolfView.opens), 0)).scalar() or 0)
+    players = db.query(func.count(func.distinct(FutgolfAttempt.user_id))).scalar() or 0
+    creators = db.query(func.count(func.distinct(FutgolfTable.created_by))).scalar() or 0
+    tables = db.query(func.count(FutgolfTable.id)).scalar() or 0
+    finished = db.query(func.count(FutgolfTable.id)).filter(FutgolfTable.status == "finished").scalar() or 0
+    rounds_played = db.query(func.count(FutgolfAttempt.id)).scalar() or 0
+    sunk = db.query(func.count(FutgolfAttempt.id)).filter(FutgolfAttempt.sunk.is_(True)).scalar() or 0
+    return {
+        "openers": openers,            # personas que abrieron la sección
+        "total_opens": total_opens,    # veces que se abrió
+        "players": players,            # personas que jugaron al menos una ronda
+        "creators": creators,          # personas que crearon una mesa
+        "tables": tables,
+        "finished_tables": finished,
+        "rounds_played": rounds_played,
+        "sunk": sunk,                  # rondas embocadas (para % de aciertos)
+    }

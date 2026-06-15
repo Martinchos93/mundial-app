@@ -42,3 +42,13 @@ class FutgolfAttempt(Base):
     sunk: Mapped[bool] = mapped_column(Boolean, default=False)
     shots: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class FutgolfView(Base):
+    """One row per user that ever opened the FutGolf section — adoption metric."""
+    __tablename__ = "futgolf_views"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    opens: Mapped[int] = mapped_column(Integer, default=1)
+    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

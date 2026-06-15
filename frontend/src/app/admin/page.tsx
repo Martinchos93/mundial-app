@@ -23,6 +23,7 @@ import {
   resetMatchResult,
   uploadMedia,
   useSettings,
+  useFutgolfStats,
   setSetting,
   liveSyncNow,
   useContactMessages,
@@ -493,20 +494,31 @@ function Toggle({ on, onClick, disabled }: { on: boolean; onClick: () => void; d
 
 function FutgolfManager() {
   const { data, mutate } = useSettings();
+  const { data: stats } = useFutgolfStats();
   const enabled = data?.futgolf_enabled ?? false;
+  const forAll = data?.futgolf_all ?? false;
   const allowed = data?.futgolf_allowed ?? [];
   const [q, setQ] = useState("");
   const { data: users } = useAdminUsers(q, 1, 8);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
 
-  async function toggleEnabled() {
-    setBusy(true);
-    try { await setSetting("futgolf_enabled", !enabled); await mutate(); } finally { setBusy(false); }
+  async function toggle(key: "futgolf_enabled" | "futgolf_all", value: boolean) {
+    setBusy(key);
+    try { await setSetting(key, value); await mutate(); } finally { setBusy(null); }
   }
   async function toggleUser(id: number) {
     const next = allowed.includes(id) ? allowed.filter((x) => x !== id) : [...allowed, id];
     await setSetting("futgolf_allowed", next); await mutate();
   }
+
+  const acceptance = stats && stats.openers > 0 ? Math.round((stats.players / stats.openers) * 100) : 0;
+  const sinkRate = stats && stats.rounds_played > 0 ? Math.round((stats.sunk / stats.rounds_played) * 100) : 0;
+  const stat = (v: number | string, label: string) => (
+    <div className="rounded-lg bg-gray-50 px-2 py-2 text-center">
+      <div className="text-[15px] font-bold text-gray-900">{v}</div>
+      <div className="text-[9.5px] leading-tight text-gray-400">{label}</div>
+    </div>
+  );
 
   return (
     <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3.5">
@@ -514,11 +526,38 @@ function FutgolfManager() {
       <div className="flex items-center justify-between border-b border-gray-50 pb-3">
         <div className="pr-3">
           <div className="text-[13px] text-gray-800">Habilitar sección</div>
-          <p className="text-[11px] text-gray-400">Muestra la pestaña ⛳ FutGolf solo a los integrantes habilitados abajo (y admins).</p>
+          <p className="text-[11px] text-gray-400">Muestra la pestaña ⛳ FutGolf a quienes estén habilitados.</p>
         </div>
-        <Toggle on={enabled} onClick={toggleEnabled} disabled={busy} />
+        <Toggle on={enabled} onClick={() => toggle("futgolf_enabled", !enabled)} disabled={busy !== null} />
       </div>
 
+      <div className="flex items-center justify-between border-b border-gray-50 py-3">
+        <div className="pr-3">
+          <div className="text-[13px] text-gray-800">Habilitar para TODOS</div>
+          <p className="text-[11px] text-gray-400">Abre la sección a todos los usuarios (ignora la lista de abajo).</p>
+        </div>
+        <Toggle on={forAll} onClick={() => toggle("futgolf_all", !forAll)} disabled={busy !== null} />
+      </div>
+
+      {/* Estadísticas de adopción */}
+      <div className="border-b border-gray-50 py-3">
+        <p className="mb-1.5 text-[11px] text-gray-400">📊 Adopción</p>
+        <div className="grid grid-cols-4 gap-1.5">
+          {stat(stats?.openers ?? "—", "abrieron")}
+          {stat(stats?.players ?? "—", "jugaron")}
+          {stat(`${acceptance}%`, "aceptación")}
+          {stat(stats?.tables ?? "—", "mesas")}
+        </div>
+        <div className="mt-1.5 grid grid-cols-4 gap-1.5">
+          {stat(stats?.total_opens ?? "—", "aperturas")}
+          {stat(stats?.creators ?? "—", "crearon")}
+          {stat(stats?.rounds_played ?? "—", "rondas")}
+          {stat(`${sinkRate}%`, "embocan")}
+        </div>
+        <p className="mt-1.5 text-[10px] text-gray-400">«Aceptación» = de los que abrieron, cuántos jugaron al menos una ronda.</p>
+      </div>
+
+      {forAll && <p className="mb-1 mt-3 text-[11px] text-amber-600">Está abierto a TODOS — la lista de abajo se ignora.</p>}
       <p className="mb-1.5 mt-3 text-[11px] text-gray-400">Integrantes habilitados ({allowed.length}). Buscá y tocá para habilitar/quitar:</p>
       <div className="relative mb-2">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />

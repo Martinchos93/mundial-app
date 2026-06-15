@@ -13,12 +13,13 @@ from app.models.champion_prediction import ChampionPrediction
 from app.models.media import Media
 from app.models.setting import Setting
 from app.models.contact import ContactMessage
-from app.models.futgolf import FutgolfTable, FutgolfParticipant, FutgolfAttempt
+from app.models.futgolf import FutgolfTable, FutgolfParticipant, FutgolfAttempt, FutgolfView
 
 __all__ = [
     "FutgolfTable",
     "FutgolfParticipant",
     "FutgolfAttempt",
+    "FutgolfView",
     "Group",
     "User",
     "Membership",

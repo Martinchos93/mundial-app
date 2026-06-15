@@ -694,6 +694,7 @@ export interface AppSettings {
   ai_enabled: boolean;
   live_scraping_enabled: boolean;
   futgolf_enabled: boolean;
+  futgolf_all: boolean;
   futgolf_allowed: number[];
 }
 
@@ -753,6 +754,16 @@ export async function startFutgolfTable(tableId: number): Promise<FutgolfTable> 
 export async function submitFutgolfResult(tableId: number, sunk: boolean, shots: number): Promise<FutgolfTable> {
   const res = await http.post(`/futgolf/tables/${tableId}/submit`, { sunk, shots });
   return res.data as FutgolfTable;
+}
+export async function trackFutgolfView(): Promise<void> {
+  try { await http.post(`/futgolf/view`); } catch { /* best-effort */ }
+}
+export interface FutgolfStats {
+  openers: number; total_opens: number; players: number; creators: number;
+  tables: number; finished_tables: number; rounds_played: number; sunk: number;
+}
+export function useFutgolfStats() {
+  return useSWR<FutgolfStats>("/futgolf/stats", (url: string) => http.get(url).then((r) => r.data as FutgolfStats));
 }
 
 // ---- Contact -----------------------------------------------------------

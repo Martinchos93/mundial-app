@@ -36,7 +36,7 @@ export default function Navbar() {
   }, [pathname]);
 
   const myId = Number(getUserId()) || 0;
-  const futgolfOk = !!settings?.futgolf_enabled && (admin || (settings?.futgolf_allowed ?? []).includes(myId));
+  const futgolfOk = !!settings?.futgolf_enabled && (settings?.futgolf_all || admin || (settings?.futgolf_allowed ?? []).includes(myId));
   const tabs = TABS.filter((t) => (!t.adminOnly || admin) && (!t.futgolfOnly || futgolfOk));
 
   return (

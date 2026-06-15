@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { ArrowLeft, Plus, Trophy } from "lucide-react";
@@ -8,7 +8,7 @@ import Navbar from "@/components/layout/Navbar";
 import {
   useSettings, useMembers,
   useFutgolfTables, useFutgolfTable,
-  createFutgolfTable, startFutgolfTable, submitFutgolfResult,
+  createFutgolfTable, startFutgolfTable, submitFutgolfResult, trackFutgolfView,
   type FutgolfTable,
 } from "@/lib/api";
 import { getSelectedGroupId, getUserId, isAdmin, cn } from "@/lib/utils";
@@ -170,7 +170,13 @@ export default function FutgolfPage() {
   const [sel, setSel] = useState<number | null>(null);
 
   const myId = Number(getUserId()) || 0;
-  const allowed = settings ? (settings.futgolf_enabled && (settings.futgolf_allowed?.includes(myId) || isAdmin())) : null;
+  const allowed = settings
+    ? settings.futgolf_enabled && (settings.futgolf_all || settings.futgolf_allowed?.includes(myId) || isAdmin())
+    : null;
+
+  useEffect(() => {
+    if (allowed) trackFutgolfView();
+  }, [allowed]);
 
   return (
     <>

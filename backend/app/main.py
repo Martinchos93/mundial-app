@@ -170,6 +170,7 @@ app.add_middleware(
 
 for r in (auth, matches, teams, players, predictions, groups, leaderboard, ai, admin, standings, stats):
     app.include_router(r.router)
+app.include_router(leaderboard.global_router)
 app.include_router(news.router)
 app.include_router(news.admin_router)
 app.include_router(bracket.router)

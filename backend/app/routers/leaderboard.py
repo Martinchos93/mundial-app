@@ -13,6 +13,55 @@ from app.schemas.group import Leaderboard, LeaderboardEntry
 from app.services.bracket import tournament_top_scorer, tournament_champion, is_tournament_finished
 
 router = APIRouter(prefix="/groups", tags=["leaderboard"])
+global_router = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
+
+
+@global_router.get("/global")
+def global_ranking(page: int = 1, page_size: int = 10, db: Session = Depends(get_db)):
+    """Site-wide ranking of all players by total points. Points are deduplicated
+    per match (max across a user's prodes) so playing many prodes never inflates
+    the score. Paginated."""
+    page = max(1, page)
+    page_size = min(max(1, page_size), 50)
+
+    # Best score per (user, match) — collapses the same pick made in many prodes.
+    best = (
+        db.query(
+            Prediction.user_id.label("uid"),
+            Prediction.match_id.label("mid"),
+            func.max(Score.total).label("best"),
+        )
+        .join(Score, Score.prediction_id == Prediction.id)
+        .group_by(Prediction.user_id, Prediction.match_id)
+        .subquery()
+    )
+    totals = (
+        db.query(best.c.uid.label("uid"), func.sum(best.c.best).label("pts"))
+        .group_by(best.c.uid)
+        .subquery()
+    )
+
+    total = db.query(func.count()).select_from(totals).scalar() or 0
+    rows = (
+        db.query(User, totals.c.pts)
+        .join(totals, totals.c.uid == User.id)
+        .order_by(totals.c.pts.desc(), User.id.asc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    start = (page - 1) * page_size
+    entries = [
+        {
+            "rank": start + i + 1,
+            "user_id": u.id,
+            "name": u.display_name,
+            "avatar_emoji": u.avatar_emoji or "⚽",
+            "points": int(pts or 0),
+        }
+        for i, (u, pts) in enumerate(rows)
+    ]
+    return {"entries": entries, "total": total, "page": page, "page_size": page_size}
 
 
 def _build_leaderboard(db: Session, group_id: int, only_today: bool) -> list[LeaderboardEntry]:

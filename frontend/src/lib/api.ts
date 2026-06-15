@@ -518,6 +518,27 @@ export function useLeaderboard(groupId: string | number | null) {
   );
 }
 
+export interface GlobalRankEntry {
+  rank: number;
+  user_id: number;
+  name: string;
+  avatar_emoji: string;
+  points: number;
+}
+export interface GlobalRanking {
+  entries: GlobalRankEntry[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+export function useGlobalRanking(page: number, pageSize = 10) {
+  return useSWR<GlobalRanking>(
+    `/leaderboard/global?page=${page}&page_size=${pageSize}`,
+    (url: string) => http.get(url).then((r) => r.data as GlobalRanking),
+    { refreshInterval: 60000, keepPreviousData: true },
+  );
+}
+
 export interface BreakdownMember {
   user_id: number;
   name: string;

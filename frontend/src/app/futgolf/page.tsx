@@ -9,7 +9,7 @@ import ProdeSwitcher from "@/components/prode/ProdeSwitcher";
 import {
   useSettings, useMembers,
   useFutgolfTables, useFutgolfTable,
-  createFutgolfTable, startFutgolfTable, submitFutgolfResult, trackFutgolfView,
+  createFutgolfTable, submitFutgolfResult, trackFutgolfView,
   type FutgolfTable,
 } from "@/lib/api";
 import { getSelectedGroupId, setSelectedGroupId, getUserId, isAdmin, cn } from "@/lib/utils";
@@ -80,18 +80,14 @@ function CreateForm({ groupId, members, onCreated }: { groupId: number; members:
 function TableView({ tableId, onBack }: { tableId: number; onBack: () => void }) {
   const { data: t, mutate } = useFutgolfTable(tableId);
   const [playing, setPlaying] = useState(false);
-  const [busy, setBusy] = useState(false);
   const myId = Number(getUserId()) || 0;
 
   if (!t) return <div className="h-40 animate-pulse rounded-xl border border-gray-200 bg-white" />;
 
-  const isCreator = t.created_by === myId;
   const winner = t.participants.find((p) => p.user_id === t.winner_user_id);
 
-  async function start() { setBusy(true); try { await startFutgolfTable(tableId); await mutate(); } finally { setBusy(false); } }
   async function onResult(sunk: boolean, shots: number) {
-    setBusy(true);
-    try { await submitFutgolfResult(tableId, sunk, shots); await mutate(); } finally { setPlaying(false); setBusy(false); }
+    try { await submitFutgolfResult(tableId, sunk, shots); await mutate(); } finally { setPlaying(false); }
   }
 
   if (playing && t.status === "playing") {
@@ -142,12 +138,6 @@ function TableView({ tableId, onBack }: { tableId: number; onBack: () => void })
       </div>
 
       {/* Acciones */}
-      {t.status === "lobby" && isCreator && (
-        <button onClick={start} disabled={busy} className="w-full rounded-lg bg-green-600 py-2.5 text-[14px] font-semibold text-white hover:bg-green-700 disabled:opacity-50">
-          {busy ? "…" : "▶️ Empezar mesa"}
-        </button>
-      )}
-      {t.status === "lobby" && !isCreator && <p className="text-center text-[12px] text-gray-400">Esperando que el creador empiece la mesa…</p>}
       {t.status === "playing" && t.my_turn && (
         <button onClick={() => setPlaying(true)} className="w-full rounded-lg bg-blue-600 py-3 text-[15px] font-semibold text-white hover:bg-blue-700">
           ⛳ Jugar mi ronda ({t.shots_allowed} {t.shots_allowed === 1 ? "tiro" : "tiros"})

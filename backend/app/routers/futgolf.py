@@ -128,6 +128,9 @@ def get_table(table_id: int, user: User = Depends(require_futgolf), db: Session 
     t = db.get(FutgolfTable, table_id)
     if t is None:
         raise HTTPException(status_code=404, detail="Mesa no encontrada")
+    if t.status == "lobby":  # no lobby anymore — anyone can play any time
+        t.status, t.round_no, t.shots_allowed = "playing", 1, 3
+        db.commit()
     return _table_out(db, t, user.id)
 
 

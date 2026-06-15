@@ -14,6 +14,7 @@ import json
 import logging
 import re
 import urllib.request
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -272,7 +273,18 @@ def fetch_and_apply(db: Session) -> dict:
             continue
 
         if new_status == "scheduled":
-            continue  # nothing to apply yet
+            # Pull the confirmed XI once Promiedos publishes it (~1h pre-kickoff)
+            # so predictors can see where everyone plays before the match locks.
+            if not m.lineups and m.kickoff_utc is not None:
+                mins_to_kick = (m.kickoff_utc - datetime.now(timezone.utc)).total_seconds() / 60
+                if 0 <= mins_to_kick <= 150:
+                    slug, gid = g.get("url_name"), g.get("id")
+                    detail = _fetch_game_detail(str(slug), str(gid)) if (slug and gid) else None
+                    if detail:
+                        ol = _oriented_lineups(detail, m.home_team == n0)
+                        if ol:
+                            m.lineups = ol
+            continue  # nothing else to apply yet
 
         changed = m.status != new_status
         m.status = new_status

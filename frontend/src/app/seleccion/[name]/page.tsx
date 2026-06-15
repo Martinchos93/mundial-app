@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import MatchCard from "@/components/match/MatchCard";
 import { useStandings, useMatches, useSquad, type SquadPlayer } from "@/lib/api";
+import PositionBadge from "@/components/PositionBadge";
 import { flagFor } from "@/lib/flags";
 import { parseISO } from "date-fns";
 import type { Match } from "@/types";
@@ -42,7 +43,8 @@ function PlayerCard({ p }: { p: SquadPlayer }) {
     <div className="flex gap-3 border-b border-gray-100 px-3.5 py-3 last:border-0">
       <PlayerAvatar p={p} size="h-12 w-12" />
       <div className="min-w-0 flex-1">
-        <div className="flex items-baseline gap-1.5">
+        <div className="flex items-center gap-1.5">
+          <PositionBadge position={p.position} />
           <span className="truncate text-[13px] font-semibold text-gray-900">{p.name}</span>
           {p.number != null && <span className="text-[11px] text-gray-300">#{p.number}</span>}
           {p.wiki_url && (

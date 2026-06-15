@@ -3,6 +3,7 @@
 import { Minus, Plus } from "lucide-react";
 import { useSquad, type SquadPlayer } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import PositionBadge, { byPosition } from "@/components/PositionBadge";
 import type { PlayerEvent } from "@/types";
 
 export type EventMap = Record<string, PlayerEvent>;
@@ -22,21 +23,6 @@ interface Props {
 }
 
 const MAX_CARDS_PER_TEAM = 3;
-
-// Position label/colour + sort order (forwards first — they're the usual picks).
-const POS_META: Record<string, { label: string; cls: string; order: number }> = {
-  FW: { label: "DEL", cls: "bg-red-50 text-red-500", order: 0 },
-  Attacker: { label: "DEL", cls: "bg-red-50 text-red-500", order: 0 },
-  MF: { label: "MED", cls: "bg-amber-50 text-amber-600", order: 1 },
-  Midfielder: { label: "MED", cls: "bg-amber-50 text-amber-600", order: 1 },
-  DF: { label: "DEF", cls: "bg-blue-50 text-blue-500", order: 2 },
-  Defender: { label: "DEF", cls: "bg-blue-50 text-blue-500", order: 2 },
-  GK: { label: "ARQ", cls: "bg-gray-100 text-gray-500", order: 3 },
-  Goalkeeper: { label: "ARQ", cls: "bg-gray-100 text-gray-500", order: 3 },
-};
-const posMeta = (pos: string | null) => POS_META[pos || ""] ?? { label: "", cls: "bg-gray-100 text-gray-400", order: 4 };
-const byPosition = (a: SquadPlayer, b: SquadPlayer) =>
-  posMeta(a.position).order - posMeta(b.position).order || (a.number ?? 99) - (b.number ?? 99);
 
 function MiniStepper({
   value,
@@ -160,11 +146,7 @@ export default function PlayerEventsTable({
             <td className="px-2.5 py-1.5">
               <span className="flex items-center gap-1.5">
                 {p.number != null && <span className="w-5 flex-none text-[10px] text-gray-400">{p.number}</span>}
-                {posMeta(p.position).label && (
-                  <span className={cn("flex-none rounded px-1 py-px text-[8.5px] font-bold tracking-wide", posMeta(p.position).cls)}>
-                    {posMeta(p.position).label}
-                  </span>
-                )}
+                <PositionBadge position={p.position} />
                 <span className="truncate text-[12px] text-gray-800">{p.name}</span>
               </span>
             </td>

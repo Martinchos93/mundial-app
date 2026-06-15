@@ -9,6 +9,7 @@ import {
   useMe,
   type PlayerSearchResult,
 } from "@/lib/api";
+import PositionBadge from "@/components/PositionBadge";
 
 export default function TopScorerCard({ columnId }: { columnId: number | null }) {
   const { data, mutate } = useTopScorer(columnId);
@@ -141,15 +142,12 @@ export default function TopScorerCard({ columnId }: { columnId: number | null })
                 onClick={() => pick(p)}
                 className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-2 text-left hover:bg-amber-50 disabled:opacity-50"
               >
-                <span className="text-[13px] text-gray-800">
+                <span className="flex items-center gap-1.5 text-[13px] text-gray-800">
+                  <PositionBadge position={p.position} />
                   {p.name}
-                  <span className="ml-1.5 text-[11px] text-gray-400">{p.team}</span>
+                  <span className="text-[11px] text-gray-400">{p.team}</span>
                 </span>
-                {data?.pick === p.name ? (
-                  <Check className="h-4 w-4 text-green-500" />
-                ) : (
-                  <span className="text-[10px] text-gray-300">{p.position}</span>
-                )}
+                {data?.pick === p.name && <Check className="h-4 w-4 flex-none text-green-500" />}
               </button>
             ))}
           </div>

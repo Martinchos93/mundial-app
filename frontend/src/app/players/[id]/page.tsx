@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowLeft, Heart } from "lucide-react";
 import { usePlayer } from "@/lib/api";
+import PositionBadge from "@/components/PositionBadge";
 import type { Player } from "@/types";
 
 function positionEmoji(pos: string): string {
@@ -56,7 +57,10 @@ export default function PlayerProfilePage({ params }: { params: { id: string } }
                   {positionEmoji(p.position)}
                 </span>
                 <div>
-                  <div className="text-[15px] font-medium text-gray-900">{p.name}</div>
+                  <div className="flex items-center gap-1.5">
+                    <PositionBadge position={p.position} />
+                    <span className="text-[15px] font-medium text-gray-900">{p.name}</span>
+                  </div>
                   <div className="text-xs text-gray-400">
                     {p.position}
                     {p.number != null && ` · #${p.number}`}

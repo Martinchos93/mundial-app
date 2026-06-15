@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowLeft, Heart } from "lucide-react";
 import { useTeam } from "@/lib/api";
+import PositionBadge from "@/components/PositionBadge";
 import type { Player } from "@/types";
 
 function positionEmoji(pos: string): string {
@@ -35,8 +36,10 @@ function PlayerRow({ player }: { player: Player }) {
         {positionEmoji(player.position)}
       </span>
       <div className="flex-1">
-        <div className="text-[13px] font-medium text-gray-900">{player.name}</div>
-        <div className="text-[11px] text-gray-400">{player.position}</div>
+        <div className="flex items-center gap-1.5">
+          <PositionBadge position={player.position} />
+          <span className="text-[13px] font-medium text-gray-900">{player.name}</span>
+        </div>
       </div>
       <div className="text-right text-xs text-gray-600">
         {hasGA && `${player.goals}G ${player.assists}A · `}

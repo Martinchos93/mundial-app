@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import MatchCard from "@/components/match/MatchCard";
 import MatchAccordion from "@/components/match/MatchAccordion";
@@ -15,7 +14,6 @@ import ScoringLegend from "@/components/prode/ScoringLegend";
 import ProdeSwitcher from "@/components/prode/ProdeSwitcher";
 import { useMatches, usePredictions, useGroupColumns, useMe } from "@/lib/api";
 import { getToken, getSelectedGroupId, setSelectedGroupId, getUserId } from "@/lib/utils";
-import type { Match } from "@/types";
 
 function PendingNotice() {
   return (
@@ -51,8 +49,6 @@ export default function ProdePage() {
     const g = getSelectedGroupId();
     return g ? Number(g) : null;
   });
-  const [selected, setSelected] = useState<Match | null>(null);
-
   const { data: me } = useMe();
   const { data: matches, isLoading } = useMatches();
   const { data: predictions, mutate: mutatePreds } = usePredictions();
@@ -65,7 +61,6 @@ export default function ProdePage() {
   function switchProde(id: number) {
     setGroupId(id);
     setSelectedGroupId(id);
-    setSelected(null);
   }
 
   if (!token) return <NoProde title="Iniciá sesión" body="Necesitás una cuenta para jugar al prode." cta="Ir a iniciar sesión" />;
@@ -77,35 +72,6 @@ export default function ProdePage() {
 
   const findPred = (matchId: number) =>
     predictions?.find((p) => p.match_id === matchId && (columnId == null || p.column_id === columnId));
-
-  if (selected) {
-    return (
-      <>
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-gray-100 bg-white px-4 py-3">
-          <button
-            onClick={() => setSelected(null)}
-            className="flex items-center gap-1 text-[13px] text-gray-500 transition-colors hover:text-gray-900"
-          >
-            <ArrowLeft className="h-4 w-4" /> Volver
-          </button>
-          <span className="text-xs text-gray-400">
-            {selected.home_team?.short_name || selected.home_team?.name} vs{" "}
-            {selected.away_team?.short_name || selected.away_team?.name}
-          </span>
-        </header>
-        <main className="space-y-2 px-4 pb-24 pt-3">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Tu predicción</p>
-          <PredictionForm
-            match={selected}
-            existing={findPred(selected.id)}
-            columnId={columnId}
-            onSaved={() => mutatePreds()}
-          />
-        </main>
-        <Navbar />
-      </>
-    );
-  }
 
   return (
     <>
@@ -132,7 +98,7 @@ export default function ProdePage() {
           renderMatch={(m) => {
             const pred = findPred(m.id);
             if (m.status === "scheduled") {
-              return <MatchCard key={m.id} match={m} prediction={pred} showPrediction onSelect={setSelected} />;
+              return <MatchCard key={m.id} match={m} prediction={pred} showPrediction />;
             }
             return pred ? (
               <PredictionForm key={m.id} match={m} existing={pred} columnId={columnId} onSaved={() => mutatePreds()} />

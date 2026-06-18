@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment, memo, useCallback, useMemo, useRef } from "react";
 import { Minus, Plus } from "lucide-react";
 import { useSquad, type SquadPlayer } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -70,6 +71,39 @@ function MiniStepper({
   );
 }
 
+type SetField = (p: SquadPlayer, team: string, field: "g" | "y" | "r", v: number) => void;
+
+// Memoized so a tap on one player only re-renders that row (not all ~52).
+const PlayerRow = memo(function PlayerRow({
+  player, team, g, y, r, goalMax, goalAtCap, yellowAtCap, redAtCap, disabled, onSet,
+}: {
+  player: SquadPlayer; team: string; g: number; y: number; r: number;
+  goalMax: number; goalAtCap: boolean; yellowAtCap: boolean; redAtCap: boolean;
+  disabled?: boolean; onSet: SetField;
+}) {
+  const touched = g || y || r;
+  return (
+    <tr className={cn("border-t border-gray-50", touched && "bg-blue-50/30")}>
+      <td className="px-2.5 py-1.5">
+        <span className="flex items-center gap-1.5">
+          {player.number != null && <span className="w-5 flex-none text-[10px] text-gray-400">{player.number}</span>}
+          <PositionBadge position={player.position} />
+          <span className="truncate text-[12px] text-gray-800">{player.name}</span>
+        </span>
+      </td>
+      <td className="px-1 py-1.5">
+        <MiniStepper tone="goal" max={goalMax} disabled={disabled} disablePlus={goalAtCap} value={g} onChange={(v) => onSet(player, team, "g", v)} />
+      </td>
+      <td className="px-1 py-1.5">
+        <MiniStepper tone="yellow" max={1} disabled={disabled} disablePlus={yellowAtCap} value={y} onChange={(v) => onSet(player, team, "y", v)} />
+      </td>
+      <td className="px-1 py-1.5">
+        <MiniStepper tone="red" max={1} disabled={disabled} disablePlus={redAtCap} value={r} onChange={(v) => onSet(player, team, "r", v)} />
+      </td>
+    </tr>
+  );
+});
+
 export default function PlayerEventsTable({
   homeTeam,
   awayTeam,
@@ -84,87 +118,78 @@ export default function PlayerEventsTable({
   const { data: home } = useSquad(homeTeam || null);
   const { data: away } = useSquad(awayTeam || null);
 
+  // Stable setter — keeps PlayerRow memoization intact across renders.
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const setField = useCallback<SetField>(
+    (p, team, field, v) => {
+      const cur = valueRef.current[p.name] ?? { name: p.name, team, g: 0, y: 0, r: 0 };
+      onChange({ ...valueRef.current, [p.name]: { ...cur, name: p.name, team, [field]: v } });
+    },
+    [onChange],
+  );
+
+  // Sort once per squad, not on every render.
+  const homePlayers = useMemo(() => [...(home?.players ?? [])].sort(byPosition), [home]);
+  const awayPlayers = useMemo(() => [...(away?.players ?? [])].sort(byPosition), [away]);
+
   const capped = [homeGoals, awayGoals, maxYellowsTotal, maxRedsTotal].some((n) => Number.isFinite(n));
-  // Goals assigned per team — must not exceed that team's predicted score.
-  const homeGoalSum = Object.values(value).filter((e) => e.team === homeTeam).reduce((s, e) => s + (e.g ?? 0), 0);
-  const awayGoalSum = Object.values(value).filter((e) => e.team === awayTeam).reduce((s, e) => s + (e.g ?? 0), 0);
+  const vals = Object.values(value);
+  const homeGoalSum = vals.filter((e) => e.team === homeTeam).reduce((s, e) => s + (e.g ?? 0), 0);
+  const awayGoalSum = vals.filter((e) => e.team === awayTeam).reduce((s, e) => s + (e.g ?? 0), 0);
   const totalGoalSum = homeGoalSum + awayGoalSum;
   const totalGoals = (Number.isFinite(homeGoals) ? homeGoals : 0) + (Number.isFinite(awayGoals) ? awayGoals : 0);
 
-  // Yellow/red player picks: ≤ 3 per team AND ≤ the predicted match total.
   const countCards = (team: string, field: "y" | "r") =>
-    Object.values(value).filter((e) => e.team === team && (e[field] ?? 0) > 0).length;
+    vals.filter((e) => e.team === team && (e[field] ?? 0) > 0).length;
   const homeYellowCount = countCards(homeTeam, "y");
   const awayYellowCount = countCards(awayTeam, "y");
   const totalYellowCount = homeYellowCount + awayYellowCount;
   const homeRedCount = countCards(homeTeam, "r");
   const awayRedCount = countCards(awayTeam, "r");
   const totalRedCount = homeRedCount + awayRedCount;
-  // The per-team "3" only applies in user prediction mode (finite total). The
-  // admin form passes no totals (Infinity) → fully unlimited.
   const yellowsPerTeamCap = Number.isFinite(maxYellowsTotal) ? MAX_CARDS_PER_TEAM : Infinity;
   const redsPerTeamCap = Number.isFinite(maxRedsTotal) ? MAX_CARDS_PER_TEAM : Infinity;
 
-  function setField(p: SquadPlayer, team: string, field: "g" | "y" | "r", v: number) {
-    const cur = value[p.name] ?? { name: p.name, team, g: 0, y: 0, r: 0 };
-    onChange({ ...value, [p.name]: { ...cur, name: p.name, team, [field]: v } });
-  }
-
-  const Section = ({ team, players }: { team: string; players?: SquadPlayer[] }) => {
+  function renderSection(team: string, players: SquadPlayer[], loaded: boolean) {
     const teamGoals = team === homeTeam ? homeGoals : awayGoals;
     const teamGoalSum = team === homeTeam ? homeGoalSum : awayGoalSum;
     const teamGoalCap = Number.isFinite(teamGoals) ? teamGoals : Infinity;
     const teamYellowCount = team === homeTeam ? homeYellowCount : awayYellowCount;
     const teamRedCount = team === homeTeam ? homeRedCount : awayRedCount;
+    const goalAtCap = teamGoalSum >= teamGoalCap;
     return (
-      <>
-      <tr className="bg-gray-50">
-        <td colSpan={4} className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-          {team}
-        </td>
-      </tr>
-      {!players && (
-        <tr>
-          <td colSpan={4} className="px-2.5 py-2 text-[11px] text-gray-300">
-            Cargando plantel…
-          </td>
+      <Fragment key={team}>
+        <tr className="bg-gray-50">
+          <td colSpan={4} className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">{team}</td>
         </tr>
-      )}
-      {[...(players ?? [])].sort(byPosition).map((p) => {
-        const ev = value[p.name];
-        const g = ev?.g ?? 0;
-        const y = ev?.y ?? 0;
-        const r = ev?.r ?? 0;
-        const touched = g || y || r;
-        // No more goals than this team's predicted score (sum across its players).
-        const goalAtCap = teamGoalSum >= teamGoalCap;
-        // Yellow/red picks: ≤ 3 per team and ≤ the predicted match total.
-        const yellowAtCap = y === 0 && (teamYellowCount >= yellowsPerTeamCap || totalYellowCount >= maxYellowsTotal);
-        const redAtCap = r === 0 && (teamRedCount >= redsPerTeamCap || totalRedCount >= maxRedsTotal);
-        return (
-          <tr key={p.id} className={cn("border-t border-gray-50", touched && "bg-blue-50/30")}>
-            <td className="px-2.5 py-1.5">
-              <span className="flex items-center gap-1.5">
-                {p.number != null && <span className="w-5 flex-none text-[10px] text-gray-400">{p.number}</span>}
-                <PositionBadge position={p.position} />
-                <span className="truncate text-[12px] text-gray-800">{p.name}</span>
-              </span>
-            </td>
-            <td className="px-1 py-1.5">
-              <MiniStepper tone="goal" max={teamGoalCap} disabled={disabled} disablePlus={goalAtCap} value={g} onChange={(v) => setField(p, team, "g", v)} />
-            </td>
-            <td className="px-1 py-1.5">
-              <MiniStepper tone="yellow" max={1} disabled={disabled} disablePlus={yellowAtCap} value={y} onChange={(v) => setField(p, team, "y", v)} />
-            </td>
-            <td className="px-1 py-1.5">
-              <MiniStepper tone="red" max={1} disabled={disabled} disablePlus={redAtCap} value={r} onChange={(v) => setField(p, team, "r", v)} />
-            </td>
-          </tr>
-        );
-      })}
-    </>
+        {!loaded && (
+          <tr><td colSpan={4} className="px-2.5 py-2 text-[11px] text-gray-300">Cargando plantel…</td></tr>
+        )}
+        {players.map((p) => {
+          const ev = value[p.name];
+          const y = ev?.y ?? 0;
+          const r = ev?.r ?? 0;
+          return (
+            <PlayerRow
+              key={p.id}
+              player={p}
+              team={team}
+              g={ev?.g ?? 0}
+              y={y}
+              r={r}
+              goalMax={teamGoalCap}
+              goalAtCap={goalAtCap}
+              yellowAtCap={y === 0 && (teamYellowCount >= yellowsPerTeamCap || totalYellowCount >= maxYellowsTotal)}
+              redAtCap={r === 0 && (teamRedCount >= redsPerTeamCap || totalRedCount >= maxRedsTotal)}
+              disabled={disabled}
+              onSet={setField}
+            />
+          );
+        })}
+      </Fragment>
     );
-  };
+  }
 
   return (
     <div>
@@ -186,8 +211,8 @@ export default function PlayerEventsTable({
             </tr>
           </thead>
           <tbody>
-            <Section team={homeTeam} players={home?.players} />
-            <Section team={awayTeam} players={away?.players} />
+            {renderSection(homeTeam, homePlayers, !!home)}
+            {renderSection(awayTeam, awayPlayers, !!away)}
           </tbody>
         </table>
       </div>

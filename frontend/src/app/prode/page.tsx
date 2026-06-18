@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
+import AccountButton from "@/components/account/AccountButton";
 import MatchCard from "@/components/match/MatchCard";
 import MatchAccordion from "@/components/match/MatchAccordion";
 import PredictionForm from "@/components/prode/PredictionForm";
@@ -77,8 +78,13 @@ export default function ProdePage() {
   return (
     <>
       <header className="sticky top-0 z-30 border-b border-gray-100 bg-white px-4 py-3">
-        <h1 className="text-base font-semibold text-gray-900">{group?.name ?? "Prode"}</h1>
-        <p className="text-[11px] text-gray-400">Predecí los próximos partidos</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-base font-semibold text-gray-900">{group?.name ?? "Prode"}</h1>
+            <p className="text-[11px] text-gray-400">Predecí los próximos partidos</p>
+          </div>
+          <AccountButton />
+        </div>
         <ProdeSwitcher value={groupId} onChange={switchProde} className="mt-2" />
       </header>
 

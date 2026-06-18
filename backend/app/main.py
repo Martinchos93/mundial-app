@@ -193,4 +193,4 @@ def health():
     # Railway injects the deployed commit SHA — expose it so we can verify which
     # version is live without dashboard access.
     commit = os.getenv("RAILWAY_GIT_COMMIT_SHA") or "dev"
-    return {"status": "ok", "commit": commit[:7]}
+    return {"status": "ok", "commit": commit[:7], "frontend_url": settings.FRONTEND_URL}

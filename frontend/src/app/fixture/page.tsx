@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Bell } from "lucide-react";
+import AccountButton from "@/components/account/AccountButton";
 import Navbar from "@/components/layout/Navbar";
 import MatchCard from "@/components/match/MatchCard";
 import MatchAccordion from "@/components/match/MatchAccordion";
@@ -45,7 +45,7 @@ export default function FixturePage() {
           <h1 className="text-base font-semibold text-gray-900">Mundial 2026 🏆</h1>
           <p className="text-[11px] text-gray-400">Hora local · {timezoneLabel()}</p>
         </div>
-        <Bell className="h-5 w-5 text-gray-400" />
+        <AccountButton />
       </header>
 
       <ProdeSwitcher value={groupId} onChange={switchProde} className="border-b border-gray-100 bg-white px-4 py-2.5" />

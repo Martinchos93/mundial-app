@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
+import AccountButton from "@/components/account/AccountButton";
 import { useNews } from "@/lib/api";
 import { formatFullDate } from "@/lib/utils";
 
@@ -30,10 +31,15 @@ export default function NewsPage() {
   return (
     <>
       <header className="sticky top-0 z-30 border-b border-gray-100 bg-white px-4 py-3">
-        <h1 className="text-base font-semibold text-gray-900">Noticias 📰</h1>
-        <p className="text-[11px] text-gray-400">
-          {total > 0 ? `${total} notas · página ${page} de ${totalPages}` : "Lo último del Mundial 2026"}
-        </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-base font-semibold text-gray-900">Noticias 📰</h1>
+            <p className="text-[11px] text-gray-400">
+              {total > 0 ? `${total} notas · página ${page} de ${totalPages}` : "Lo último del Mundial 2026"}
+            </p>
+          </div>
+          <AccountButton />
+        </div>
       </header>
 
       <main className="px-4 pb-24 pt-3">

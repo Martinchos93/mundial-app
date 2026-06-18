@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowLeft, MapPin } from "lucide-react";
 import { useMatch, usePredictions, useAIPrediction, useActiveColumnId, useSettings } from "@/lib/api";
+import Navbar from "@/components/layout/Navbar";
 import LiveStats from "@/components/match/LiveStats";
 import Lineups from "@/components/match/Lineups";
 import AIPredictionCard from "@/components/match/AIPredictionCard";
@@ -59,7 +60,7 @@ export default function MatchDetailPage({ params }: { params: { id: string } }) 
         )}
       </header>
 
-      <main className="px-4 pb-10 pt-4">
+      <main className="px-4 pb-24 pt-4">
         {isLoading && <div className="h-40 animate-pulse rounded-xl border border-gray-200 bg-white" />}
         {error && (
           <p className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600">
@@ -163,6 +164,7 @@ export default function MatchDetailPage({ params }: { params: { id: string } }) 
           </div>
         )}
       </main>
+      <Navbar />
     </>
   );
 }

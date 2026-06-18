@@ -28,6 +28,7 @@ from app.routers import (
     settings as settings_router,
     contact,
     futgolf,
+    polls,
 )
 from app.tasks.scheduler import start_scheduler, stop_scheduler
 
@@ -173,6 +174,8 @@ for r in (auth, matches, teams, players, predictions, groups, leaderboard, ai, a
     app.include_router(r.router)
 app.include_router(leaderboard.global_router)
 app.include_router(futgolf.router)
+app.include_router(polls.router)
+app.include_router(polls.admin_router)
 app.include_router(news.router)
 app.include_router(news.admin_router)
 app.include_router(bracket.router)

@@ -25,6 +25,11 @@ import {
   uploadMedia,
   useSettings,
   useFutgolfStats,
+  useAdminPolls,
+  usePollResults,
+  createPoll,
+  togglePoll,
+  deletePoll,
   setSetting,
   liveSyncNow,
   useContactMessages,
@@ -513,6 +518,116 @@ function Toggle({ on, onClick, disabled }: { on: boolean; onClick: () => void; d
   );
 }
 
+function PollResultsInline({ pollId }: { pollId: number }) {
+  const { data } = usePollResults(pollId);
+  if (!data) return <p className="px-1 py-2 text-[11px] text-gray-400">Cargando…</p>;
+  if (data.kind === "options") {
+    const total = data.total || 0;
+    return (
+      <div className="space-y-1 px-1 py-2">
+        {data.options.map((o, i) => {
+          const c = data.tallies?.[i] ?? 0;
+          const pct = total > 0 ? Math.round((c / total) * 100) : 0;
+          return (
+            <div key={i} className="relative overflow-hidden rounded-md border border-gray-100 bg-white">
+              <div className="absolute inset-y-0 left-0 bg-blue-100" style={{ width: `${pct}%` }} />
+              <div className="relative flex justify-between px-2 py-1 text-[11.5px]"><span>{o}</span><span className="text-gray-500">{c} · {pct}%</span></div>
+            </div>
+          );
+        })}
+        <p className="text-[10px] text-gray-400">{total} votos</p>
+      </div>
+    );
+  }
+  return (
+    <div className="max-h-48 space-y-1 overflow-y-auto px-1 py-2">
+      {(data.texts ?? []).map((t, i) => (
+        <div key={i} className="rounded-md bg-gray-50 px-2 py-1 text-[11.5px]">
+          <span className="text-gray-400">{t.name}:</span> <span className="text-gray-700">{t.text}</span>
+        </div>
+      ))}
+      {(data.texts ?? []).length === 0 && <p className="text-[11px] text-gray-400">Sin respuestas todavía.</p>}
+    </div>
+  );
+}
+
+function PollManager() {
+  const { data: polls, mutate } = useAdminPolls();
+  const [q, setQ] = useState("");
+  const [kind, setKind] = useState<"options" | "text">("options");
+  const [opts, setOpts] = useState<string[]>(["", ""]);
+  const [busy, setBusy] = useState(false);
+  const [openResults, setOpenResults] = useState<number | null>(null);
+
+  async function create() {
+    if (!q.trim()) return;
+    setBusy(true);
+    try {
+      await createPoll(q.trim(), kind, kind === "options" ? opts : []);
+      setQ(""); setOpts(["", ""]); await mutate();
+    } catch { /* ignore */ } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3.5">
+      <div className="mb-2.5 text-[13px] font-medium text-gray-900">📣 Encuestas</div>
+
+      {/* Crear */}
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Pregunta de la encuesta"
+        className="mb-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-[13px] focus:border-blue-400 focus:outline-none" />
+      <div className="mb-2 flex gap-1.5">
+        {(["options", "text"] as const).map((k) => (
+          <button key={k} onClick={() => setKind(k)}
+            className={cn("flex-1 rounded-lg border py-1.5 text-[12px] font-medium", kind === k ? "border-blue-400 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600")}>
+            {k === "options" ? "Opciones" : "Texto libre (500)"}
+          </button>
+        ))}
+      </div>
+      {kind === "options" && (
+        <div className="mb-2 space-y-1.5">
+          {opts.map((o, i) => (
+            <input key={i} value={o} onChange={(e) => setOpts((p) => p.map((x, j) => (j === i ? e.target.value : x)))}
+              placeholder={`Opción ${i + 1}`}
+              className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-[12.5px] focus:border-blue-400 focus:outline-none" />
+          ))}
+          <button onClick={() => setOpts((p) => [...p, ""])} className="text-[11px] text-blue-600">+ agregar opción</button>
+        </div>
+      )}
+      <button onClick={create} disabled={busy} className="mb-3 w-full rounded-lg bg-blue-600 py-2 text-[13px] font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+        {busy ? "Creando…" : "Crear y publicar (queda activa)"}
+      </button>
+
+      {/* Lista */}
+      <div className="space-y-2">
+        {(polls ?? []).map((p) => (
+          <div key={p.id} className="rounded-lg border border-gray-100 p-2.5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="truncate text-[12.5px] font-medium text-gray-800">{p.question}</div>
+                <div className="text-[10.5px] text-gray-400">
+                  {p.kind === "options" ? "Opciones" : "Texto"} · {p.responses} respuestas {p.is_active && <span className="text-green-600">· activa</span>}
+                </div>
+              </div>
+              <div className="flex flex-none items-center gap-1.5">
+                <button onClick={async () => { await togglePoll(p.id, !p.is_active); await mutate(); }}
+                  className={cn("rounded-md px-2 py-1 text-[10.5px] font-medium", p.is_active ? "bg-gray-100 text-gray-600" : "bg-green-50 text-green-600")}>
+                  {p.is_active ? "Pausar" : "Activar"}
+                </button>
+                <button onClick={() => setOpenResults(openResults === p.id ? null : p.id)} className="rounded-md bg-blue-50 px-2 py-1 text-[10.5px] font-medium text-blue-600">
+                  {openResults === p.id ? "Ocultar" : "Resultados"}
+                </button>
+                <button onClick={async () => { if (confirm("¿Borrar encuesta?")) { await deletePoll(p.id); await mutate(); } }} className="rounded-md px-1.5 py-1 text-[12px] text-gray-300 hover:text-red-500">✕</button>
+              </div>
+            </div>
+            {openResults === p.id && <PollResultsInline pollId={p.id} />}
+          </div>
+        ))}
+        {(polls ?? []).length === 0 && <p className="py-2 text-center text-[11px] text-gray-400">No hay encuestas todavía.</p>}
+      </div>
+    </div>
+  );
+}
+
 function FutgolfManager() {
   const { data, mutate } = useSettings();
   const { data: stats } = useFutgolfStats();
@@ -984,6 +1099,7 @@ export default function AdminPage() {
         <ActiveUsersCard />
         <ContactManager />
         <SettingsManager />
+        <PollManager />
         <FutgolfManager />
         <ResultsManager />
         <UsersTable />

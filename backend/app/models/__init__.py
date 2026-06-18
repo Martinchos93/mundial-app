@@ -14,12 +14,15 @@ from app.models.media import Media
 from app.models.setting import Setting
 from app.models.contact import ContactMessage
 from app.models.futgolf import FutgolfTable, FutgolfParticipant, FutgolfAttempt, FutgolfView
+from app.models.poll import Poll, PollResponse
 
 __all__ = [
     "FutgolfTable",
     "FutgolfParticipant",
     "FutgolfAttempt",
     "FutgolfView",
+    "Poll",
+    "PollResponse",
     "Group",
     "User",
     "Membership",

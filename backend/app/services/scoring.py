@@ -34,7 +34,7 @@ DEFAULT_CONFIG: dict[str, int] = {
 # Anti-gaming caps: at most this many players per category per match (otherwise
 # filling the whole squad would guarantee every hit).
 MAX_PICKS = 5  # legacy name-list fallback
-MAX_GOAL_PICKS = 5
+MAX_GOALS_PER_TEAM = 3  # goleadores cap per team = min(predicted score, this)
 MAX_YELLOW_PICKS = 3
 MAX_RED_PICKS = 3
 
@@ -102,13 +102,14 @@ def _score_players(
     actual_booked,
     actual_reds,
     cfg: dict,
+    goal_budget: dict[str, int] | None = None,
 ) -> tuple[int, int]:
     """Count-based scoring for per-player picks. Returns (goal_pts, card_pts).
 
-    Goals: +pts_scorer per correctly predicted goal, min(pred, actual) per player.
+    Goals: +pts_scorer per correctly predicted goal. Counted goals per TEAM are
+    capped at goal_budget[team] = min(predicted team score, MAX_GOALS_PER_TEAM),
+    so a 11-11 prediction with the whole squad can't farm scorer points.
     Cards: yellow pick that landed +pts_card; red pick that landed +pts_card_red.
-    Caps per match: up to MAX_GOAL_PICKS goal picks, MAX_YELLOW_PICKS yellow
-    picks and MAX_RED_PICKS red picks count, to limit gaming.
     """
     # A red-carded player isn't double-counted as a yellow.
     booked = list(actual_booked or [])
@@ -116,18 +117,25 @@ def _score_players(
     yellows = [n for n in booked if not any(_name_match(n, rp) for rp in reds)]
 
     goal_pts = card_pts = 0
-    goal_used = yellow_used = red_used = 0
+    yellow_used = red_used = 0
+    used_goals: dict[str, int] = {}  # correct goals already counted per team
     for p in pred_players or []:
         name = p.get("name", "")
         if not _name_tokens(name):
             continue
+        team = p.get("team") or ""
         g = int(p.get("g", 0) or 0)
         y = int(p.get("y", 0) or 0)
         r = int(p.get("r", 0) or 0)
 
-        if g > 0 and goal_used < MAX_GOAL_PICKS:
-            goal_used += 1
-            goal_pts += min(g, _match_count(name, actual_scorers)) * int(cfg["pts_scorer"])
+        if g > 0:
+            cap = (goal_budget or {}).get(team, MAX_GOALS_PER_TEAM)
+            room = cap - used_goals.get(team, 0)
+            if room > 0:
+                counted = min(g, _match_count(name, actual_scorers), room)
+                if counted > 0:
+                    goal_pts += counted * int(cfg["pts_scorer"])
+                    used_goals[team] = used_goals.get(team, 0) + counted
 
         if r > 0 and red_used < MAX_RED_PICKS:
             red_used += 1
@@ -165,6 +173,8 @@ def calculate_score(
     actual_scorers: list[str] | None = None,
     actual_booked: list[str] | None = None,
     actual_reds_players: list[str] | None = None,
+    home_team: str | None = None,
+    away_team: str | None = None,
     config: dict[str, Any] | None = None,
 ) -> ScoreBreakdown:
     """Compute the score breakdown for a single prediction vs a final result."""
@@ -191,8 +201,15 @@ def calculate_score(
     # Per-player picks. Prefer the count-based pred_players; fall back to the
     # legacy name-list membership for older predictions.
     if pred_players:
+        # Per-team goleador cap = min(predicted team score, MAX_GOALS_PER_TEAM).
+        goal_budget: dict[str, int] = {}
+        if home_team:
+            goal_budget[home_team] = min(pred_home, MAX_GOALS_PER_TEAM)
+        if away_team:
+            goal_budget[away_team] = min(pred_away, MAX_GOALS_PER_TEAM)
         breakdown.pts_scorers, breakdown.pts_cards = _score_players(
-            pred_players, actual_scorers, actual_booked, actual_reds_players, cfg
+            pred_players, actual_scorers, actual_booked, actual_reds_players, cfg,
+            goal_budget or None,
         )
     else:
         breakdown.pts_scorers = _count_hits(pred_scorers, actual_scorers) * int(cfg["pts_scorer"])
@@ -227,5 +244,7 @@ def score_prediction(prediction, match, config: dict | None = None) -> ScoreBrea
         actual_scorers=match.scorers,
         actual_booked=match.booked,
         actual_reds_players=match.red_players,
+        home_team=match.home_team,
+        away_team=match.away_team,
         config=config,
     )

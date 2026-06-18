@@ -24,6 +24,7 @@ interface Props {
 }
 
 const MAX_CARDS_PER_TEAM = 3;
+const MAX_GOALS_PER_TEAM = 3; // goleadores por equipo = min(marcador, 3)
 
 function MiniStepper({
   value,
@@ -138,7 +139,10 @@ export default function PlayerEventsTable({
   const homeGoalSum = vals.filter((e) => e.team === homeTeam).reduce((s, e) => s + (e.g ?? 0), 0);
   const awayGoalSum = vals.filter((e) => e.team === awayTeam).reduce((s, e) => s + (e.g ?? 0), 0);
   const totalGoalSum = homeGoalSum + awayGoalSum;
-  const totalGoals = (Number.isFinite(homeGoals) ? homeGoals : 0) + (Number.isFinite(awayGoals) ? awayGoals : 0);
+  // Goleadores asignables por equipo = min(marcador, 3).
+  const homeGoalCap = Number.isFinite(homeGoals) ? Math.min(homeGoals, MAX_GOALS_PER_TEAM) : Infinity;
+  const awayGoalCap = Number.isFinite(awayGoals) ? Math.min(awayGoals, MAX_GOALS_PER_TEAM) : Infinity;
+  const totalGoals = (Number.isFinite(homeGoalCap) ? homeGoalCap : 0) + (Number.isFinite(awayGoalCap) ? awayGoalCap : 0);
 
   const countCards = (team: string, field: "y" | "r") =>
     vals.filter((e) => e.team === team && (e[field] ?? 0) > 0).length;
@@ -152,9 +156,8 @@ export default function PlayerEventsTable({
   const redsPerTeamCap = Number.isFinite(maxRedsTotal) ? MAX_CARDS_PER_TEAM : Infinity;
 
   function renderSection(team: string, players: SquadPlayer[], loaded: boolean) {
-    const teamGoals = team === homeTeam ? homeGoals : awayGoals;
     const teamGoalSum = team === homeTeam ? homeGoalSum : awayGoalSum;
-    const teamGoalCap = Number.isFinite(teamGoals) ? teamGoals : Infinity;
+    const teamGoalCap = team === homeTeam ? homeGoalCap : awayGoalCap;
     const teamYellowCount = team === homeTeam ? homeYellowCount : awayYellowCount;
     const teamRedCount = team === homeTeam ? homeRedCount : awayRedCount;
     const goalAtCap = teamGoalSum >= teamGoalCap;

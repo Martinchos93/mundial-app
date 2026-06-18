@@ -362,8 +362,8 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
           {openTable && (
             <div className="mt-2">
               <p className="mb-1.5 text-[10px] text-gray-400">
-                Goles +3 c/u · amarilla +2 · roja +4. Los goles deben coincidir con tu marcador{" "}
-                <span className="font-medium">({home}-{away})</span>; amarillas/rojas hasta 3 por equipo y no más de las que predijiste arriba.
+                Goles +3 c/u · amarilla +2 · roja +4. Goleadores: hasta tu marcador{" "}
+                <span className="font-medium">({home}-{away})</span> y como máximo <span className="font-medium">3 por equipo</span>. Amarillas/rojas hasta 3 por equipo y no más de las que predijiste.
               </p>
               <PlayerEventsTable
                 homeTeam={homeTeamName}

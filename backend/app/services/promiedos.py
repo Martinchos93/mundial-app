@@ -73,6 +73,35 @@ def _games_from_page(html: str) -> list[dict]:
     return games
 
 
+LEAGUE_ID = "fjda"
+GAMES_API = "https://api.promiedos.com.ar/league/games/{lid}/{key}"
+
+
+def _round_keys(html: str) -> list[str]:
+    """Round keys (e.g. '5930_25_1_2' = Fecha 2) from the league page filters."""
+    try:
+        m = re.search(r'__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.S)
+        data = json.loads(m.group(1))
+        filters = data["props"]["pageProps"]["data"]["games"]["filters"]
+        return [f["key"] for f in filters if f.get("key") and f["key"] != "latest"]
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def _all_games(html: str) -> list[dict]:
+    """Games across EVERY matchday. The league page only server-renders 'Fecha 1',
+    so we pull each round from the per-round API (that's how we discover later
+    matchdays like Czech vs South Africa). Falls back to the Fecha-1 scrape."""
+    games: list[dict] = []
+    for key in _round_keys(html):
+        try:
+            raw = _http_get(GAMES_API.format(lid=LEAGUE_ID, key=key))
+            games.extend(json.loads(raw).get("games") or [])
+        except Exception:  # noqa: BLE001
+            continue
+    return games or _games_from_page(html)
+
+
 def _status_of(game: dict) -> str:
     st = game.get("status") or {}
     name = (st.get("name") or "").lower()
@@ -194,7 +223,7 @@ def fetch_and_apply(db: Session) -> dict:
         return {"enabled": False, "updated": 0}
 
     try:
-        games = _games_from_page(_http_get(LEAGUE_URL))
+        games = _all_games(_http_get(LEAGUE_URL))
     except Exception:  # noqa: BLE001
         logger.exception("promiedos fetch failed")
         return {"enabled": True, "error": True, "updated": 0}

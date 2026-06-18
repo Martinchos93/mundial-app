@@ -39,6 +39,27 @@ def _has_active_window(db) -> bool:
     return bool(upcoming)
 
 
+def _needs_catchup(db) -> bool:
+    """Recent matches still missing data (results not synced, or finished without
+    lineups) — so the promiedos job keeps running to backfill them even when no
+    match is live/imminent (e.g. between the group stage and the knockouts)."""
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=5)
+    stuck = (
+        db.query(func.count(Match.id))
+        .filter(Match.status == "scheduled", Match.kickoff_utc < now, Match.kickoff_utc >= cutoff)
+        .scalar()
+        or 0
+    )
+    missing_lineups = (
+        db.query(func.count(Match.id))
+        .filter(Match.status == "finished", Match.lineups.is_(None), Match.kickoff_utc >= cutoff)
+        .scalar()
+        or 0
+    )
+    return bool(stuck or missing_lineups)
+
+
 def _has_today_matches(db) -> bool:
     now = datetime.now(timezone.utc)
     start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
@@ -72,7 +93,7 @@ async def _job_promiedos() -> None:
 
     db = SessionLocal()
     try:
-        if not promiedos.is_enabled(db) or not _has_active_window(db):
+        if not promiedos.is_enabled(db) or not (_has_active_window(db) or _needs_catchup(db)):
             return
         res = promiedos.fetch_and_apply(db)
         if res.get("updated"):

@@ -18,7 +18,8 @@ export default function RegisterPage() {
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setF((s) => ({ ...s, [k]: e.target.value }));
 
-  async function handle() {
+  async function handle(e?: React.FormEvent) {
+    e?.preventDefault();
     if (!f.first_name || !f.last_name || !f.email || !f.username || !f.password) {
       setError("Completá todos los campos obligatorios.");
       return;
@@ -58,23 +59,24 @@ export default function RegisterPage() {
           <div className="text-3xl">🏆</div>
           <h1 className="mt-2 text-xl font-semibold text-gray-900">Crear cuenta</h1>
         </div>
-        <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-5">
+        <form onSubmit={handle} className="space-y-3 rounded-xl border border-gray-200 bg-white p-5">
           <div className="flex gap-2">
-            <input className={input} placeholder="Nombre" value={f.first_name} onChange={set("first_name")} />
-            <input className={input} placeholder="Apellido" value={f.last_name} onChange={set("last_name")} />
+            <input className={input} name="given-name" autoComplete="given-name" placeholder="Nombre" value={f.first_name} onChange={set("first_name")} />
+            <input className={input} name="family-name" autoComplete="family-name" placeholder="Apellido" value={f.last_name} onChange={set("last_name")} />
           </div>
           <div className="flex gap-2">
             <input className={input} type="number" placeholder="Edad" value={f.age} onChange={set("age")} />
-            <input className={input} type="email" placeholder="Email" value={f.email} onChange={set("email")} />
+            <input className={input} type="email" name="email" autoComplete="email" placeholder="Email" value={f.email} onChange={set("email")} />
           </div>
-          <input className={input} placeholder="Usuario" value={f.username} onChange={set("username")} />
-          <input className={input} type="password" placeholder="Contraseña (mín. 6)" value={f.password} onChange={set("password")} />
+          <input className={input} name="username" autoComplete="username" placeholder="Usuario" value={f.username} onChange={set("username")} />
+          <input className={input} type="password" name="password" autoComplete="new-password" placeholder="Contraseña (mín. 6)" value={f.password} onChange={set("password")} />
           <div>
             <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-gray-400">Tu avatar</p>
             <div className="flex flex-wrap gap-2">
               {EMOJIS.map((e) => (
                 <button
                   key={e}
+                  type="button"
                   onClick={() => setEmoji(e)}
                   className={cn(
                     "flex h-9 w-9 items-center justify-center rounded-full text-lg",
@@ -88,13 +90,13 @@ export default function RegisterPage() {
           </div>
           {error && <p className="text-xs text-red-500">{error}</p>}
           <button
-            onClick={handle}
+            type="submit"
             disabled={loading}
             className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
           >
             {loading ? "Creando..." : "Crear cuenta"}
           </button>
-        </div>
+        </form>
         <p className="mt-4 text-center text-sm text-gray-400">
           ¿Ya tenés cuenta?{" "}
           <Link href="/login" className="font-medium text-blue-600">

@@ -12,7 +12,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handle() {
+  async function handle(e?: React.FormEvent) {
+    e?.preventDefault();
     if (!username.trim() || !password) {
       setError("Completá usuario (o email) y contraseña.");
       return;
@@ -41,19 +42,27 @@ export default function LoginPage() {
           <h1 className="mt-2 text-xl font-semibold text-gray-900">Mundial 2026</h1>
           <p className="text-sm text-gray-400">Iniciá sesión para jugar al prode</p>
         </div>
-        <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-5">
-          <input className={input} placeholder="Usuario o email" value={username} onChange={(e) => setUsername(e.target.value)} />
+        <form onSubmit={handle} className="space-y-3 rounded-xl border border-gray-200 bg-white p-5">
+          <input
+            className={input}
+            name="username"
+            autoComplete="username"
+            placeholder="Usuario o email"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
           <input
             className={input}
             type="password"
+            name="password"
+            autoComplete="current-password"
             placeholder="Contraseña"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handle()}
           />
           {error && <p className="text-xs text-red-500">{error}</p>}
           <button
-            onClick={handle}
+            type="submit"
             disabled={loading}
             className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
           >
@@ -64,7 +73,7 @@ export default function LoginPage() {
               ¿Olvidaste tu contraseña?
             </Link>
           </p>
-        </div>
+        </form>
         <p className="mt-4 text-center text-sm text-gray-400">
           ¿No tenés cuenta?{" "}
           <Link href="/register" className="font-medium text-blue-600">

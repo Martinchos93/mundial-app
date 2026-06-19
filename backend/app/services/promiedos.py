@@ -136,6 +136,7 @@ def _score_of(game: dict) -> tuple[int | None, int | None]:
 
 
 GAME_DETAIL_URL = "https://www.promiedos.com.ar/game/{slug}/{gid}"
+MAX_DETAIL_PER_RUN = 8  # cap slow detail fetches per sync so we don't hold the DB conn
 # promiedos timeline event types
 _EV_YELLOW = 4
 _EV_RED = 5
@@ -229,6 +230,17 @@ def fetch_and_apply(db: Session) -> dict:
         return {"enabled": True, "error": True, "updated": 0}
 
     updated = 0
+    # Cap detail-page fetches per run: each one is a slow HTTP request held while
+    # the DB connection is open. Bounding it keeps each sync short (frees the
+    # connection) and spreads the backfill over several runs.
+    detail_left = [MAX_DETAIL_PER_RUN]
+
+    def fetch_detail(slug, gid):
+        if not (slug and gid) or detail_left[0] <= 0:
+            return None
+        detail_left[0] -= 1
+        return _fetch_game_detail(str(slug), str(gid))
+
     for g in games:
         teams = g.get("teams") or []
         if len(teams) != 2:
@@ -280,7 +292,7 @@ def fetch_and_apply(db: Session) -> dict:
             need_lineups = not m.lineups
             if need_yellows or need_lineups:
                 slug, gid = g.get("url_name"), g.get("id")
-                detail = _fetch_game_detail(str(slug), str(gid)) if (slug and gid) else None
+                detail = fetch_detail(slug, gid)
                 if detail:
                     if need_yellows:
                         y0, y1 = detail["yellows"]
@@ -308,7 +320,7 @@ def fetch_and_apply(db: Session) -> dict:
                 mins_to_kick = (m.kickoff_utc - datetime.now(timezone.utc)).total_seconds() / 60
                 if 0 <= mins_to_kick <= 150:
                     slug, gid = g.get("url_name"), g.get("id")
-                    detail = _fetch_game_detail(str(slug), str(gid)) if (slug and gid) else None
+                    detail = fetch_detail(slug, gid)
                     if detail:
                         ol = _oriented_lineups(detail, m.home_team == n0)
                         if ol:
@@ -332,21 +344,20 @@ def fetch_and_apply(db: Session) -> dict:
         # Yellows + booked/sent-off names are NOT in the league feed — pull them
         # from the game detail page so the yellow/card scoring can land.
         slug, gid = g.get("url_name"), g.get("id")
-        if slug and gid:
-            detail = _fetch_game_detail(str(slug), str(gid))
-            if detail:
-                y0, y1 = detail["yellows"]
-                hy, ay = (y0, y1) if m.home_team == n0 else (y1, y0)
-                if hy is not None:
-                    m.home_yellows = hy
-                if ay is not None:
-                    m.away_yellows = ay
-                m.booked = detail["booked"] or None  # combined names; scoring matches by name
-                if detail["sent_off"]:
-                    m.red_players = detail["sent_off"]
-                ol = _oriented_lineups(detail, m.home_team == n0)
-                if ol:
-                    m.lineups = ol
+        detail = fetch_detail(slug, gid)
+        if detail:
+            y0, y1 = detail["yellows"]
+            hy, ay = (y0, y1) if m.home_team == n0 else (y1, y0)
+            if hy is not None:
+                m.home_yellows = hy
+            if ay is not None:
+                m.away_yellows = ay
+            m.booked = detail["booked"] or None  # combined names; scoring matches by name
+            if detail["sent_off"]:
+                m.red_players = detail["sent_off"]
+            ol = _oriented_lineups(detail, m.home_team == n0)
+            if ol:
+                m.lineups = ol
 
         # One-time visibility into the live structure (helps verify score field).
         if (g.get("status") or {}).get("enum") not in (1, None):

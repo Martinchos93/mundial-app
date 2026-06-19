@@ -116,9 +116,17 @@ def _score_players(
     reds = list(actual_reds or [])
     yellows = [n for n in booked if not any(_name_match(n, rp) for rp in reds)]
 
+    # Goals ASSIGNED per team. Picking more than the cap = gaming the system
+    # (spam the whole squad to guarantee the scorer): that team scores 0.
+    assigned: dict[str, int] = {}
+    for p in pred_players or []:
+        g = int(p.get("g", 0) or 0)
+        if g > 0:
+            t = p.get("team") or ""
+            assigned[t] = assigned.get(t, 0) + g
+
     goal_pts = card_pts = 0
     yellow_used = red_used = 0
-    used_goals: dict[str, int] = {}  # correct goals already counted per team
     for p in pred_players or []:
         name = p.get("name", "")
         if not _name_tokens(name):
@@ -130,12 +138,9 @@ def _score_players(
 
         if g > 0:
             cap = (goal_budget or {}).get(team, MAX_GOALS_PER_TEAM)
-            room = cap - used_goals.get(team, 0)
-            if room > 0:
-                counted = min(g, _match_count(name, actual_scorers), room)
-                if counted > 0:
-                    goal_pts += counted * int(cfg["pts_scorer"])
-                    used_goals[team] = used_goals.get(team, 0) + counted
+            # Only a genuine pick (≤ cap goals for that team) scores; spam = 0.
+            if assigned.get(team, 0) <= cap:
+                goal_pts += min(g, _match_count(name, actual_scorers)) * int(cfg["pts_scorer"])
 
         if r > 0 and red_used < MAX_RED_PICKS:
             red_used += 1

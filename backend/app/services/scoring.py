@@ -35,8 +35,7 @@ DEFAULT_CONFIG: dict[str, int] = {
 # filling the whole squad would guarantee every hit).
 MAX_PICKS = 5  # legacy name-list fallback
 MAX_GOALS_PER_TEAM = 3  # goleadores cap per team = min(predicted score, this)
-MAX_YELLOW_PICKS = 3
-MAX_RED_PICKS = 3
+# Yellow/red picks are capped at what the user predicted (anti-spam in _score_players).
 
 
 @dataclass
@@ -103,31 +102,40 @@ def _score_players(
     actual_reds,
     cfg: dict,
     goal_budget: dict[str, int] | None = None,
+    max_yellows: int | None = None,
+    max_reds: int | None = None,
 ) -> tuple[int, int]:
     """Count-based scoring for per-player picks. Returns (goal_pts, card_pts).
 
-    Goals: +pts_scorer per correctly predicted goal. Counted goals per TEAM are
-    capped at goal_budget[team] = min(predicted team score, MAX_GOALS_PER_TEAM),
-    so a 11-11 prediction with the whole squad can't farm scorer points.
-    Cards: yellow pick that landed +pts_card; red pick that landed +pts_card_red.
+    Anti-spam: picking MORE players than you predicted for a category means you
+    just dumped the whole squad to guarantee a hit — that category scores 0.
+      - Goals: per team, picks must be ≤ min(predicted team score, 3).
+      - Yellows: total yellow picks must be ≤ predicted yellows.
+      - Reds: total red picks must be ≤ predicted reds.
+    A genuine pick (≤ what you predicted) scores each player that landed.
     """
     # A red-carded player isn't double-counted as a yellow.
     booked = list(actual_booked or [])
     reds = list(actual_reds or [])
     yellows = [n for n in booked if not any(_name_match(n, rp) for rp in reds)]
 
-    # Goals ASSIGNED per team. Picking more than the cap = gaming the system
-    # (spam the whole squad to guarantee the scorer): that team scores 0.
+    pp = pred_players or []
+    # Goals assigned per team + yellow/red pick counts (to detect squad-spam).
     assigned: dict[str, int] = {}
-    for p in pred_players or []:
+    yellow_picks = red_picks = 0
+    for p in pp:
         g = int(p.get("g", 0) or 0)
         if g > 0:
-            t = p.get("team") or ""
-            assigned[t] = assigned.get(t, 0) + g
+            assigned[p.get("team") or ""] = assigned.get(p.get("team") or "", 0) + g
+        if int(p.get("y", 0) or 0) > 0:
+            yellow_picks += 1
+        if int(p.get("r", 0) or 0) > 0:
+            red_picks += 1
+    yellow_ok = max_yellows is None or yellow_picks <= max_yellows
+    red_ok = max_reds is None or red_picks <= max_reds
 
     goal_pts = card_pts = 0
-    yellow_used = red_used = 0
-    for p in pred_players or []:
+    for p in pp:
         name = p.get("name", "")
         if not _name_tokens(name):
             continue
@@ -138,19 +146,14 @@ def _score_players(
 
         if g > 0:
             cap = (goal_budget or {}).get(team, MAX_GOALS_PER_TEAM)
-            # Only a genuine pick (≤ cap goals for that team) scores; spam = 0.
-            if assigned.get(team, 0) <= cap:
+            if assigned.get(team, 0) <= cap:  # genuine pick; spam = 0
                 goal_pts += min(g, _match_count(name, actual_scorers)) * int(cfg["pts_scorer"])
 
-        if r > 0 and red_used < MAX_RED_PICKS:
-            red_used += 1
-            if any(_name_match(name, rp) for rp in reds):
-                card_pts += int(cfg["pts_card_red"])
+        if r > 0 and red_ok and any(_name_match(name, rp) for rp in reds):
+            card_pts += int(cfg["pts_card_red"])
 
-        if y > 0 and yellow_used < MAX_YELLOW_PICKS:
-            yellow_used += 1
-            if any(_name_match(name, yp) for yp in yellows):
-                card_pts += int(cfg["pts_card"])
+        if y > 0 and yellow_ok and any(_name_match(name, yp) for yp in yellows):
+            card_pts += int(cfg["pts_card"])
     return goal_pts, card_pts
 
 
@@ -214,7 +217,7 @@ def calculate_score(
             goal_budget[away_team] = min(pred_away, MAX_GOALS_PER_TEAM)
         breakdown.pts_scorers, breakdown.pts_cards = _score_players(
             pred_players, actual_scorers, actual_booked, actual_reds_players, cfg,
-            goal_budget or None,
+            goal_budget or None, max_yellows=pred_yellows, max_reds=pred_reds,
         )
     else:
         breakdown.pts_scorers = _count_hits(pred_scorers, actual_scorers) * int(cfg["pts_scorer"])

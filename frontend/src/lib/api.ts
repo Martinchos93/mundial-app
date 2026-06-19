@@ -768,7 +768,7 @@ export function useFutgolfStats() {
 
 // ---- Polls -------------------------------------------------------------
 export interface ActivePoll {
-  id: number; question: string; kind: "options" | "text"; options: string[];
+  id: number; question: string; kind: "options" | "text" | "message"; options: string[];
   answered: boolean; my_option: number | null; my_text: string | null;
   tallies?: number[]; total?: number;
 }
@@ -779,19 +779,19 @@ export function useActivePoll() {
 export async function respondPoll(pollId: number, body: { option_index?: number; text?: string }): Promise<void> {
   await http.post(`/polls/${pollId}/respond`, body);
 }
-export interface AdminPoll { id: number; question: string; kind: "options" | "text"; options: string[]; is_active: boolean; responses: number; }
+export interface AdminPoll { id: number; question: string; kind: "options" | "text" | "message"; options: string[]; is_active: boolean; responses: number; }
 export function useAdminPolls() {
   return useSWR<AdminPoll[]>("/admin/polls", (url: string) => http.get(url).then((r) => r.data));
 }
 export interface PollResults {
-  id: number; question: string; kind: "options" | "text"; options: string[];
+  id: number; question: string; kind: "options" | "text" | "message"; options: string[];
   tallies?: number[]; total?: number; texts?: { name: string; text: string }[];
 }
 export function usePollResults(pollId: number | null) {
   return useSWR<PollResults>(pollId ? `/admin/polls/${pollId}/results` : null,
     (url: string) => http.get(url).then((r) => r.data));
 }
-export async function createPoll(question: string, kind: "options" | "text", options: string[]): Promise<void> {
+export async function createPoll(question: string, kind: "options" | "text" | "message", options: string[]): Promise<void> {
   await http.post(`/admin/polls`, { question, kind, options });
 }
 export async function togglePoll(pollId: number, isActive: boolean): Promise<void> {

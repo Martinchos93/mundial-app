@@ -27,19 +27,22 @@ export default function PollCard() {
     try { await respondPoll(poll!.id, { text: text.trim() }); await mutate(); } finally { setBusy(false); }
   }
 
+  const isMessage = poll.kind === "message";
+
   return (
     <div className="mb-4 overflow-hidden rounded-xl border border-blue-200 bg-blue-50/60">
-      <div className="flex items-start justify-between gap-2 px-3.5 pt-3">
+      <div className="flex items-start justify-between gap-2 px-3.5 pt-3 pb-3.5">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-blue-500">📣 Encuesta</div>
-          <h3 className="mt-0.5 text-[13.5px] font-semibold text-gray-900">{poll.question}</h3>
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-blue-500">{isMessage ? "📣 Aviso" : "📣 Encuesta"}</div>
+          <h3 className="mt-0.5 whitespace-pre-line text-[13.5px] font-semibold text-gray-900">{poll.question}</h3>
         </div>
         <button onClick={() => setDismissed(true)} className="rounded-full p-1 text-gray-400 hover:bg-white/60">
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      <div className="px-3.5 pb-3.5 pt-2.5">
+      {!isMessage && (
+      <div className="px-3.5 pb-3.5">
         {/* Opciones — sin responder */}
         {poll.kind === "options" && !poll.answered && (
           <div className="space-y-1.5">
@@ -99,6 +102,7 @@ export default function PollCard() {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

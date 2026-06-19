@@ -554,7 +554,7 @@ function PollResultsInline({ pollId }: { pollId: number }) {
 function PollManager() {
   const { data: polls, mutate } = useAdminPolls();
   const [q, setQ] = useState("");
-  const [kind, setKind] = useState<"options" | "text">("options");
+  const [kind, setKind] = useState<"options" | "text" | "message">("options");
   const [opts, setOpts] = useState<string[]>(["", ""]);
   const [busy, setBusy] = useState(false);
   const [openResults, setOpenResults] = useState<number | null>(null);
@@ -573,13 +573,14 @@ function PollManager() {
       <div className="mb-2.5 text-[13px] font-medium text-gray-900">📣 Encuestas</div>
 
       {/* Crear */}
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Pregunta de la encuesta"
-        className="mb-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-[13px] focus:border-blue-400 focus:outline-none" />
+      <textarea value={q} onChange={(e) => setQ(e.target.value)} rows={kind === "message" ? 3 : 1}
+        placeholder={kind === "message" ? "Escribí el aviso/mensaje (ej: ¡Gracias por participar!)" : "Pregunta de la encuesta"}
+        className="mb-2 w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-[13px] focus:border-blue-400 focus:outline-none" />
       <div className="mb-2 flex gap-1.5">
-        {(["options", "text"] as const).map((k) => (
+        {(["options", "text", "message"] as const).map((k) => (
           <button key={k} onClick={() => setKind(k)}
-            className={cn("flex-1 rounded-lg border py-1.5 text-[12px] font-medium", kind === k ? "border-blue-400 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600")}>
-            {k === "options" ? "Opciones" : "Texto libre (500)"}
+            className={cn("flex-1 rounded-lg border py-1.5 text-[11px] font-medium", kind === k ? "border-blue-400 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600")}>
+            {k === "options" ? "Opciones" : k === "text" ? "Texto libre" : "Aviso"}
           </button>
         ))}
       </div>
@@ -605,7 +606,9 @@ function PollManager() {
               <div className="min-w-0">
                 <div className="truncate text-[12.5px] font-medium text-gray-800">{p.question}</div>
                 <div className="text-[10.5px] text-gray-400">
-                  {p.kind === "options" ? "Opciones" : "Texto"} · {p.responses} respuestas {p.is_active && <span className="text-green-600">· activa</span>}
+                  {p.kind === "options" ? "Opciones" : p.kind === "text" ? "Texto" : "Aviso"}
+                  {p.kind !== "message" && ` · ${p.responses} respuestas`}
+                  {p.is_active && <span className="text-green-600"> · activa</span>}
                 </div>
               </div>
               <div className="flex flex-none items-center gap-1.5">
@@ -613,9 +616,11 @@ function PollManager() {
                   className={cn("rounded-md px-2 py-1 text-[10.5px] font-medium", p.is_active ? "bg-gray-100 text-gray-600" : "bg-green-50 text-green-600")}>
                   {p.is_active ? "Pausar" : "Activar"}
                 </button>
-                <button onClick={() => setOpenResults(openResults === p.id ? null : p.id)} className="rounded-md bg-blue-50 px-2 py-1 text-[10.5px] font-medium text-blue-600">
-                  {openResults === p.id ? "Ocultar" : "Resultados"}
-                </button>
+                {p.kind !== "message" && (
+                  <button onClick={() => setOpenResults(openResults === p.id ? null : p.id)} className="rounded-md bg-blue-50 px-2 py-1 text-[10.5px] font-medium text-blue-600">
+                    {openResults === p.id ? "Ocultar" : "Resultados"}
+                  </button>
+                )}
                 <button onClick={async () => { if (confirm("¿Borrar encuesta?")) { await deletePoll(p.id); await mutate(); } }} className="rounded-md px-1.5 py-1 text-[12px] text-gray-300 hover:text-red-500">✕</button>
               </div>
             </div>

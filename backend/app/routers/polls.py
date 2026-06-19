@@ -64,6 +64,8 @@ def respond(poll_id: int, payload: RespondIn, current_user: User = Depends(get_c
     poll = db.get(Poll, poll_id)
     if poll is None or not poll.is_active:
         raise HTTPException(status_code=404, detail="La encuesta no está disponible.")
+    if poll.kind == "message":
+        raise HTTPException(status_code=400, detail="Es un aviso, no se responde.")
     if poll.kind == "options":
         n = len(poll.options or [])
         if payload.option_index is None or not (0 <= payload.option_index < n):
@@ -94,7 +96,7 @@ class PollCreate(BaseModel):
 
 @admin_router.post("")
 def create_poll(payload: PollCreate, db: Session = Depends(get_db)):
-    kind = payload.kind if payload.kind in ("options", "text") else "options"
+    kind = payload.kind if payload.kind in ("options", "text", "message") else "options"
     opts = [o.strip() for o in payload.options if o.strip()] if kind == "options" else None
     if kind == "options" and (not opts or len(opts) < 2):
         raise HTTPException(status_code=400, detail="Una encuesta de opciones necesita al menos 2 opciones.")

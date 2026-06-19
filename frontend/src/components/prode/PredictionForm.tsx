@@ -256,6 +256,36 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
     return Math.min(n, 30);
   }
 
+  // When the scoreline / global cards change, drop the per-player picks that no
+  // longer fit the new caps, so the user re-selects them.
+  function refit(nh: number, na: number, ny: number, nr: number) {
+    setEvents((prev) => {
+      const vals = Object.values(prev);
+      const homeG = vals.filter((e) => e.team === homeTeamName).reduce((s, e) => s + (e.g ?? 0), 0);
+      const awayG = vals.filter((e) => e.team === awayTeamName).reduce((s, e) => s + (e.g ?? 0), 0);
+      const yCount = vals.filter((e) => (e.y ?? 0) > 0).length;
+      const rCount = vals.filter((e) => (e.r ?? 0) > 0).length;
+      const clearHomeG = homeG > Math.min(nh, 3);
+      const clearAwayG = awayG > Math.min(na, 3);
+      const clearY = yCount > ny;
+      const clearR = rCount > nr;
+      if (!clearHomeG && !clearAwayG && !clearY && !clearR) return prev;
+      const next: EventMap = {};
+      for (const [k, v] of Object.entries(prev)) {
+        let nv = v;
+        if ((v.team === homeTeamName && clearHomeG) || (v.team === awayTeamName && clearAwayG)) nv = { ...nv, g: 0 };
+        if (clearY) nv = { ...nv, y: 0 };
+        if (clearR) nv = { ...nv, r: 0 };
+        next[k] = nv;
+      }
+      return next;
+    });
+  }
+  const onHome = (v: number) => { setHome(v); refit(v, away, yellows, reds); };
+  const onAway = (v: number) => { setAway(v); refit(home, v, yellows, reds); };
+  const onYellows = (v: number) => { setYellows(v); refit(home, away, v, reds); };
+  const onReds = (v: number) => { setReds(v); refit(home, away, yellows, v); };
+
   async function handleSubmit() {
     setSaving(true);
     setError(null);
@@ -313,7 +343,7 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
             value={home}
             disabled={locked}
             onFocus={(e) => e.currentTarget.select()}
-            onChange={(e) => setHome(clampScore(e.target.value))}
+            onChange={(e) => onHome(clampScore(e.target.value))}
             className="h-14 w-14 rounded-xl border border-gray-200 bg-gray-50 text-center text-[22px] font-semibold text-gray-900 focus:border-blue-400 focus:outline-none disabled:text-gray-400"
           />
         </div>
@@ -327,15 +357,15 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
             value={away}
             disabled={locked}
             onFocus={(e) => e.currentTarget.select()}
-            onChange={(e) => setAway(clampScore(e.target.value))}
+            onChange={(e) => onAway(clampScore(e.target.value))}
             className="h-14 w-14 rounded-xl border border-gray-200 bg-gray-50 text-center text-[22px] font-semibold text-gray-900 focus:border-blue-400 focus:outline-none disabled:text-gray-400"
           />
         </div>
       </div>
 
       <div className="mb-3 flex gap-2">
-        <Stepper label="🟨 Amarillas" value={yellows} onChange={setYellows} disabled={locked} />
-        <Stepper label="🟥 Rojas" value={reds} onChange={setReds} disabled={locked} />
+        <Stepper label="🟨 Amarillas" value={yellows} onChange={onYellows} disabled={locked} />
+        <Stepper label="🟥 Rojas" value={reds} onChange={onReds} disabled={locked} />
         <div className="flex-1 rounded-lg bg-gray-50 p-2 text-center">
           <div className="mb-1.5 text-[10px] text-gray-400">⚽ Goles</div>
           <div className="text-lg font-semibold text-gray-700">{home + away}</div>

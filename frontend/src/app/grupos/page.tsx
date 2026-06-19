@@ -30,7 +30,7 @@ const MEDALS = ["🥇", "🥈", "🥉"];
 const AV = ["bg-blue-100 text-blue-600", "bg-amber-100 text-amber-600", "bg-green-100 text-green-600", "bg-pink-100 text-pink-600", "bg-purple-100 text-purple-600", "bg-orange-100 text-orange-600"];
 const initials = (n: string) => n.trim().slice(0, 2).toUpperCase();
 
-function LeaderRow({ e, rank, isMe }: { e: LeaderboardEntry; rank: number; isMe: boolean }) {
+function LeaderRow({ e, rank, isMe, onRemove }: { e: LeaderboardEntry; rank: number; isMe: boolean; onRemove?: () => void }) {
   return (
     <div className={cn("flex items-center gap-2.5 border-b border-gray-100 px-3.5 py-2.5 last:border-0", isMe && "bg-blue-50")}>
       <span className="w-6 text-center text-base">{rank <= 3 ? MEDALS[rank - 1] : <span className="text-[13px] text-gray-400">{rank}</span>}</span>
@@ -42,22 +42,33 @@ function LeaderRow({ e, rank, isMe }: { e: LeaderboardEntry; rank: number; isMe:
         <div className="text-[11px] text-gray-400">{e.total_points} pts{e.streak ? ` · racha ${e.streak}` : ""}</div>
       </div>
       <div className="text-[15px] font-semibold text-gray-900">{e.total_points}</div>
+      {onRemove && (
+        <button onClick={onRemove} title="Eliminar del prode" className="rounded-full p-1 text-gray-300 hover:bg-red-50 hover:text-red-500">
+          <X className="h-4 w-4" />
+        </button>
+      )}
     </div>
   );
 }
 
 function SelectedProde({ m, userId }: { m: MembershipInfo; userId: number }) {
   const gid = m.group_id;
-  const { data: leaderboard } = useLeaderboard(gid);
+  const { data: leaderboard, mutate: mutateLeaderboard } = useLeaderboard(gid);
   const { data: members, mutate: mutateMembers } = useMembers(gid);
   const [copied, setCopied] = useState(false);
 
   const pending = (members ?? []).filter((x) => x.status === "pending");
+  const creatorId = (members ?? []).find((x) => x.is_creator)?.user_id;
 
   async function decide(uid: number, ok: boolean) {
     if (ok) await approveMember(gid, uid);
     else await rejectMember(gid, uid);
     mutateMembers();
+  }
+  async function removeMember(uid: number, name: string) {
+    if (!confirm(`¿Eliminar a ${name} del prode? Deja de aparecer en la tabla.`)) return;
+    await rejectMember(gid, uid);
+    await Promise.all([mutateMembers(), mutateLeaderboard()]);
   }
   function copyCode() {
     navigator.clipboard?.writeText(m.invite_code);
@@ -99,7 +110,15 @@ function SelectedProde({ m, userId }: { m: MembershipInfo; userId: number }) {
         <span className="font-normal lowercase tracking-normal text-gray-400">{(leaderboard ?? []).length} jugando</span>
       </p>
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-        {(leaderboard ?? []).map((e, i) => <LeaderRow key={e.user_id} e={e} rank={i + 1} isMe={e.user_id === userId} />)}
+        {(leaderboard ?? []).map((e, i) => (
+          <LeaderRow
+            key={e.user_id}
+            e={e}
+            rank={i + 1}
+            isMe={e.user_id === userId}
+            onRemove={m.is_creator && e.user_id !== creatorId ? () => removeMember(e.user_id, e.name) : undefined}
+          />
+        ))}
         {leaderboard?.length === 0 && <p className="px-3.5 py-6 text-center text-sm text-gray-400">Todavía no hay integrantes.</p>}
       </div>
 

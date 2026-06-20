@@ -135,6 +135,7 @@ def _score_players(
     red_ok = max_reds is None or red_picks <= max_reds
 
     goal_pts = card_pts = 0
+    team_awarded: dict[str, int] = {}
     for p in pp:
         name = p.get("name", "")
         if not _name_tokens(name):
@@ -145,9 +146,17 @@ def _score_players(
         r = int(p.get("r", 0) or 0)
 
         if g > 0:
-            cap = (goal_budget or {}).get(team, MAX_GOALS_PER_TEAM)
-            if assigned.get(team, 0) <= cap:  # genuine pick; spam = 0
-                goal_pts += min(g, _match_count(name, actual_scorers)) * int(cfg["pts_scorer"])
+            # Anti-spam: assigning MORE goals to a team than you predicted for it
+            # = dumping the squad → that team's goals score 0. A genuine pick
+            # (≤ predicted) credits each scorer that landed, capped at 3 per team.
+            pred_team = (goal_budget or {}).get(team, MAX_GOALS_PER_TEAM)
+            if assigned.get(team, 0) <= pred_team:
+                room = min(pred_team, MAX_GOALS_PER_TEAM) - team_awarded.get(team, 0)
+                if room > 0:
+                    award = min(min(g, _match_count(name, actual_scorers)), room)
+                    if award > 0:
+                        goal_pts += award * int(cfg["pts_scorer"])
+                        team_awarded[team] = team_awarded.get(team, 0) + award
 
         if r > 0 and red_ok and any(_name_match(name, rp) for rp in reds):
             card_pts += int(cfg["pts_card_red"])
@@ -209,12 +218,13 @@ def calculate_score(
     # Per-player picks. Prefer the count-based pred_players; fall back to the
     # legacy name-list membership for older predictions.
     if pred_players:
-        # Per-team goleador cap = min(predicted team score, MAX_GOALS_PER_TEAM).
+        # Per-team budget = goals PREDICTED for that team (raw). The anti-spam
+        # threshold is this budget; the points cap is min(budget, 3) per team.
         goal_budget: dict[str, int] = {}
         if home_team:
-            goal_budget[home_team] = min(pred_home, MAX_GOALS_PER_TEAM)
+            goal_budget[home_team] = pred_home
         if away_team:
-            goal_budget[away_team] = min(pred_away, MAX_GOALS_PER_TEAM)
+            goal_budget[away_team] = pred_away
         breakdown.pts_scorers, breakdown.pts_cards = _score_players(
             pred_players, actual_scorers, actual_booked, actual_reds_players, cfg,
             goal_budget or None, max_yellows=pred_yellows, max_reds=pred_reds,

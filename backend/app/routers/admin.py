@@ -345,7 +345,8 @@ def set_match_result(match_id: int, payload: MatchResultIn, db: Session = Depend
         m.status = "finished"
     db.flush()
 
-    recalculated = recalculate_match_scores(db, m) if m.status == "finished" else 0
+    # Admin is editing the actual result on purpose → allowed to adjust down too.
+    recalculated = recalculate_match_scores(db, m, allow_decrease=True) if m.status == "finished" else 0
     db.commit()
 
     # Propagate into the knockout bracket (best-effort).

@@ -140,8 +140,14 @@ def _config_for_match(db: Session, match_id: int) -> dict | None:
     return col.scoring_config if col else None
 
 
-def recalculate_match_scores(db: Session, match: Match) -> int:
-    """Recompute Score rows for every prediction on a finished match."""
+def recalculate_match_scores(db: Session, match: Match, allow_decrease: bool = False) -> int:
+    """Recompute Score rows for every prediction on a finished match.
+
+    By default a recalc NEVER lowers an already-awarded total — points only go up
+    or stay. This protects the leaderboard from retroactive subtractions when a
+    scoring rule or scraped data changes after a match was scored. An admin
+    editing the actual result (set_match_result) passes allow_decrease=True.
+    """
     if match.status != "finished":
         return 0
     predictions = db.query(Prediction).filter(Prediction.match_id == match.id).all()
@@ -150,6 +156,8 @@ def recalculate_match_scores(db: Session, match: Match) -> int:
         col = db.get(Column, pred.column_id)
         config = col.scoring_config if col else None
         breakdown = score_prediction(pred, match, config)
+        if pred.score is not None and not allow_decrease and breakdown.total < pred.score.total:
+            continue  # never strip points already given on a plain recalc
         score = pred.score or Score(prediction_id=pred.id)
         score.pts_result = breakdown.pts_result
         score.pts_exact = breakdown.pts_exact

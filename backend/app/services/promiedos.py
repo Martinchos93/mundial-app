@@ -327,7 +327,7 @@ def fetch_and_apply(db: Session) -> dict:
                             m.lineups = ol  # committed by the final db.commit()
             if changed_fin:
                 db.flush()
-                recalculate_match_scores(db, m)
+                recalculate_match_scores(db, m, source="sync")
                 updated += 1
             continue
 
@@ -385,7 +385,7 @@ def fetch_and_apply(db: Session) -> dict:
             updated += 1
         if new_status == "finished":
             db.flush()
-            recalculate_match_scores(db, m)
+            recalculate_match_scores(db, m, source="sync")
 
     db.commit()
     return {"enabled": True, "updated": updated, "games": len(games)}

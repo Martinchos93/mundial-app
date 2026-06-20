@@ -5,6 +5,7 @@ from app.models.match import Match
 from app.models.column import Column
 from app.models.prediction import Prediction
 from app.models.score import Score
+from app.models.score_history import ScoreHistory
 from app.models.ai_prediction import AIPrediction
 from app.models.news import News
 from app.models.player import Player
@@ -30,6 +31,7 @@ __all__ = [
     "Column",
     "Prediction",
     "Score",
+    "ScoreHistory",
     "AIPrediction",
     "News",
     "Player",

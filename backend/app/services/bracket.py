@@ -354,7 +354,7 @@ def simulate(db: Session) -> dict:
 
     # 3) Score predictions on every finished match
     for m in db.query(Match).filter(Match.status == "finished").all():
-        recalculate_match_scores(db, m)
+        recalculate_match_scores(db, m, source="bracket")
 
     champion = db.query(Match).filter(Match.match_no == 104).one_or_none()
     winner = None

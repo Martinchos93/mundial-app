@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, EmailStr
 from app.database import get_db
 from app.deps import get_current_admin
 from app.models import (
-    Column, Match, Prediction, Score, User, Group, AIPrediction, Membership,
+    Column, Match, Prediction, Score, ScoreHistory, User, Group, AIPrediction, Membership,
     TopScorerPrediction, ChampionPrediction,
 )
 from app.models.column import DEFAULT_SCORING_CONFIG
@@ -264,7 +264,7 @@ def recalculate_all(db: Session = Depends(get_db)):
     matches = db.query(Match).filter(Match.status == "finished").all()
     total = 0
     for m in matches:
-        total += recalculate_match_scores(db, m)
+        total += recalculate_match_scores(db, m, source="recalc_all")
     db.commit()
     return {"matches": len(matches), "recalculated_predictions": total}
 
@@ -279,8 +279,39 @@ def recalculate_match(match_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Match not found")
     if m.status != "finished":
         raise HTTPException(status_code=400, detail="El partido no está terminado")
-    n = recalculate_match_scores(db, m)  # commits internally
+    n = recalculate_match_scores(db, m, source="recalc_match")  # commits internally
     return {"match_id": m.id, "recalculated_predictions": n}
+
+
+@router.get("/score-history")
+def score_history(limit: int = 200, db: Session = Depends(get_db)):
+    """Audit trail of score changes (before/after + source) so a wrong scoring
+    event can be reviewed. Most recent first."""
+    limit = max(1, min(limit, 1000))
+    rows = (
+        db.query(ScoreHistory, User, Match)
+        .join(Prediction, Prediction.id == ScoreHistory.prediction_id)
+        .join(User, User.id == Prediction.user_id)
+        .join(Match, Match.id == Prediction.match_id)
+        .order_by(ScoreHistory.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        {
+            "id": h.id,
+            "created_at": h.created_at,
+            "source": h.source,
+            "user": u.first_name or u.username,
+            "match": f"{m.home_team} {m.home_score}-{m.away_score} {m.away_team}",
+            "old_total": h.old_total,
+            "new_total": h.new_total,
+            "delta": h.new_total - h.old_total,
+            "old_breakdown": h.old_breakdown,
+            "new_breakdown": h.new_breakdown,
+        }
+        for (h, u, m) in rows
+    ]
 
 
 class MatchResultIn(BaseModel):
@@ -346,7 +377,7 @@ def set_match_result(match_id: int, payload: MatchResultIn, db: Session = Depend
     db.flush()
 
     # Admin is editing the actual result on purpose → allowed to adjust down too.
-    recalculated = recalculate_match_scores(db, m, allow_decrease=True) if m.status == "finished" else 0
+    recalculated = recalculate_match_scores(db, m, allow_decrease=True, source="manual_result") if m.status == "finished" else 0
     db.commit()
 
     # Propagate into the knockout bracket (best-effort).

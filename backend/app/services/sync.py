@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import SessionLocal
-from app.models import Match, Column, Prediction, Score
+from app.models import Match, Column, Prediction, Score, ScoreHistory
 from app.services import football_api
 from app.services.scoring import score_prediction
 
@@ -100,7 +100,7 @@ def upsert_fixture(db: Session, fx: dict) -> Match | None:
 
     # When a match transitions into "finished", recalc its scores.
     if prev_status != "finished" and match.status == "finished":
-        recalculate_match_scores(db, match)
+        recalculate_match_scores(db, match, source="sync")
 
     return match
 
@@ -140,13 +140,26 @@ def _config_for_match(db: Session, match_id: int) -> dict | None:
     return col.scoring_config if col else None
 
 
-def recalculate_match_scores(db: Session, match: Match, allow_decrease: bool = False) -> int:
+def _score_snapshot(s: Score) -> dict:
+    return {
+        "pts_result": s.pts_result, "pts_exact": s.pts_exact, "pts_yellows": s.pts_yellows,
+        "pts_reds": s.pts_reds, "pts_bonus": s.pts_bonus, "pts_scorers": s.pts_scorers,
+        "pts_cards": s.pts_cards, "total": s.total,
+    }
+
+
+def recalculate_match_scores(
+    db: Session, match: Match, allow_decrease: bool = False, source: str = "recalc"
+) -> int:
     """Recompute Score rows for every prediction on a finished match.
 
     By default a recalc NEVER lowers an already-awarded total — points only go up
     or stay. This protects the leaderboard from retroactive subtractions when a
     scoring rule or scraped data changes after a match was scored. An admin
     editing the actual result (set_match_result) passes allow_decrease=True.
+
+    Any change to an EXISTING score is recorded in score_history (before/after +
+    source) so a wrong scoring event can be reviewed/undone later.
     """
     if match.status != "finished":
         return 0
@@ -156,9 +169,11 @@ def recalculate_match_scores(db: Session, match: Match, allow_decrease: bool = F
         col = db.get(Column, pred.column_id)
         config = col.scoring_config if col else None
         breakdown = score_prediction(pred, match, config)
-        if pred.score is not None and not allow_decrease and breakdown.total < pred.score.total:
+        existing = pred.score
+        if existing is not None and not allow_decrease and breakdown.total < existing.total:
             continue  # never strip points already given on a plain recalc
-        score = pred.score or Score(prediction_id=pred.id)
+        old_snap = _score_snapshot(existing) if existing is not None else None
+        score = existing or Score(prediction_id=pred.id)
         score.pts_result = breakdown.pts_result
         score.pts_exact = breakdown.pts_exact
         score.pts_yellows = breakdown.pts_yellows
@@ -167,21 +182,29 @@ def recalculate_match_scores(db: Session, match: Match, allow_decrease: bool = F
         score.pts_scorers = breakdown.pts_scorers
         score.pts_cards = breakdown.pts_cards
         score.total = breakdown.total
-        if pred.score is None:
+        if existing is None:
             db.add(score)
         pred.locked = True
         count += 1
+        # Audit only real CHANGES to a pre-existing score (skip initial scoring).
+        new_snap = _score_snapshot(score)
+        if old_snap is not None and old_snap != new_snap:
+            db.add(ScoreHistory(
+                prediction_id=pred.id, source=source,
+                old_total=old_snap["total"], new_total=new_snap["total"],
+                old_breakdown=old_snap, new_breakdown=new_snap,
+            ))
     db.commit()
     return count
 
 
-def recalculate_column(db: Session, column: Column) -> int:
+def recalculate_column(db: Session, column: Column, source: str = "recalc_column") -> int:
     """Recompute every prediction in a column whose match is finished."""
     total = 0
     for match_id in column.match_ids or []:
         match = db.get(Match, match_id)
         if match and match.status == "finished":
-            total += recalculate_match_scores(db, match)
+            total += recalculate_match_scores(db, match, source=source)
     return total
 
 

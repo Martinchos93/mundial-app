@@ -30,8 +30,8 @@ function LiveBadge() {
   );
 }
 
-/** Matches organized into three fixed sections: TODAY (always open, pinned to
- *  top), then UPCOMING and PAST days as collapsible cards. */
+/** Matches in three sections: TODAY (always open, pinned to top), then UPCOMING
+ *  and PAST as collapsible blocks (each with collapsible day cards inside). */
 export default function MatchAccordion({
   matches,
   renderMatch,
@@ -60,31 +60,27 @@ export default function MatchAccordion({
     return { today, upcoming, past };
   }, [days, todayKey]);
 
-  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const [openDay, setOpenDay] = useState<Record<string, boolean>>({});
+  const [openSection, setOpenSection] = useState<{ prox: boolean; pas: boolean }>({ prox: false, pas: false });
   const inited = useRef(false);
   useEffect(() => {
     if (inited.current || days.length === 0) return;
     inited.current = true;
     const init: Record<string, boolean> = {};
-    let hasToday = false;
-    for (const [k, ms] of days) {
-      if (k === todayKey) hasToday = true;
-      if (ms.some((m) => m.status === "live")) init[k] = true; // live days open
-    }
-    // Nothing today → open the next upcoming day so something is visible.
-    if (!hasToday) {
-      const firstUpcoming = days.find(([k]) => k > todayKey);
-      if (firstUpcoming) init[firstUpcoming[0]] = true;
-    }
-    setOpen(init);
-  }, [days, todayKey]);
+    for (const [k, ms] of days) if (ms.some((m) => m.status === "live")) init[k] = true; // live days open
+    setOpenDay(init);
+    // Nothing today → open the "Próximos" section so something is visible.
+    if (today.length === 0 && upcoming.length > 0) setOpenSection((s) => ({ ...s, prox: true }));
+  }, [days, today.length, upcoming.length]);
 
   if (days.length === 0) {
     return <p className="py-8 text-center text-sm text-gray-400">{emptyText}</p>;
   }
 
+  const count = (entries: [string, Match[]][]) => entries.reduce((n, [, ms]) => n + ms.length, 0);
+
   const dayCard = (day: string, dayMatches: Match[]) => {
-    const isOpen = !!open[day];
+    const isOpen = !!openDay[day];
     const hasLive = dayMatches.some((m) => m.status === "live");
     return (
       <div
@@ -95,7 +91,7 @@ export default function MatchAccordion({
         )}
       >
         <button
-          onClick={() => setOpen((o) => ({ ...o, [day]: !o[day] }))}
+          onClick={() => setOpenDay((o) => ({ ...o, [day]: !o[day] }))}
           className="flex w-full items-center justify-between gap-2 px-3.5 py-3 text-left"
         >
           <div className="min-w-0">
@@ -114,12 +110,32 @@ export default function MatchAccordion({
     );
   };
 
-  const sectionLabel = (text: string) => (
-    <p className="mb-1.5 mt-1 px-0.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400">{text}</p>
-  );
+  const section = (
+    key: "prox" | "pas",
+    title: string,
+    entries: [string, Match[]][],
+  ) => {
+    if (entries.length === 0) return null;
+    const isOpen = openSection[key];
+    const n = count(entries);
+    return (
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50/70">
+        <button
+          onClick={() => setOpenSection((s) => ({ ...s, [key]: !s[key] }))}
+          className="flex w-full items-center justify-between gap-2 px-3.5 py-3 text-left"
+        >
+          <span className="text-[12px] font-semibold uppercase tracking-wider text-gray-500">
+            {title} <span className="ml-1 font-normal normal-case text-gray-400">· {n} partido{n === 1 ? "" : "s"}</span>
+          </span>
+          <ChevronDown className={cn("h-4 w-4 flex-none text-gray-400 transition-transform", isOpen && "rotate-180")} />
+        </button>
+        {isOpen && <div className="space-y-2.5 px-2 pb-2.5 pt-0.5">{entries.map(([day, ms]) => dayCard(day, ms))}</div>}
+      </div>
+    );
+  };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* HOY — always expanded, pinned to top */}
       {today.map(([day, ms]) => {
         const hasLive = ms.some((m) => m.status === "live");
@@ -139,21 +155,8 @@ export default function MatchAccordion({
         );
       })}
 
-      {/* PRÓXIMOS — future days, chronological */}
-      {upcoming.length > 0 && (
-        <div>
-          {sectionLabel("Próximos")}
-          <div className="space-y-2.5">{upcoming.map(([day, ms]) => dayCard(day, ms))}</div>
-        </div>
-      )}
-
-      {/* PASADOS — past days, most recent first */}
-      {past.length > 0 && (
-        <div>
-          {sectionLabel("Pasados")}
-          <div className="space-y-2.5">{past.map(([day, ms]) => dayCard(day, ms))}</div>
-        </div>
-      )}
+      {section("prox", "Próximos", upcoming)}
+      {section("pas", "Pasados", past)}
     </div>
   );
 }

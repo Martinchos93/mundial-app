@@ -39,20 +39,20 @@ B|2026-06-24|16:00|Switzerland|Canada|Vancouver
 B|2026-06-24|16:00|Bosnia and Herzegovina|Qatar|Seattle
 C|2026-06-13|19:00|Brazil|Morocco|Foxborough
 C|2026-06-13|22:00|Haiti|Scotland|East Rutherford
-C|2026-06-19|22:00|Brazil|Haiti|Philadelphia
+C|2026-06-19|21:30|Brazil|Haiti|Philadelphia
 C|2026-06-19|19:00|Scotland|Morocco|Foxborough
 C|2026-06-24|19:00|Scotland|Brazil|Miami Gardens
 C|2026-06-24|19:00|Morocco|Haiti|Atlanta
 D|2026-06-12|22:00|USA|Paraguay|Inglewood
 D|2026-06-14|01:00|Australia|Turkey|Vancouver
-D|2026-06-20|01:00|Turkey|Paraguay|Santa Clara
+D|2026-06-20|00:00|Turkey|Paraguay|Santa Clara
 D|2026-06-19|16:00|USA|Australia|Seattle
 D|2026-06-25|23:00|Turkey|USA|Inglewood
 D|2026-06-25|23:00|Paraguay|Australia|Santa Clara
 E|2026-06-14|14:00|Germany|Curacao|Philadelphia
 E|2026-06-14|20:00|Cote D'Ivoire|Ecuador|Houston
 E|2026-06-20|17:00|Germany|Cote D'Ivoire|Toronto
-E|2026-06-20|23:00|Ecuador|Curacao|Kansas City
+E|2026-06-20|21:00|Ecuador|Curacao|Kansas City
 E|2026-06-25|17:00|Ecuador|Germany|Philadelphia
 E|2026-06-25|17:00|Curacao|Cote D'Ivoire|East Rutherford
 F|2026-06-14|17:00|Netherlands|Japan|Arlington

@@ -14,7 +14,7 @@ import json
 import logging
 import re
 import urllib.request
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -112,16 +112,6 @@ def _status_of(game: dict) -> str:
         return "scheduled"
     return "live"  # 1T / 2T / ENT / minute / "En Vivo" ...
 
-
-_AR_TZ = timezone(timedelta(hours=-3))  # promiedos start_time is Argentina local
-
-
-def _parse_start(s) -> datetime | None:
-    """Parse promiedos 'DD-MM-YYYY HH:MM' (Argentina time) into UTC."""
-    try:
-        return datetime.strptime(str(s), "%d-%m-%Y %H:%M").replace(tzinfo=_AR_TZ).astimezone(timezone.utc)
-    except Exception:  # noqa: BLE001
-        return None
 
 
 def _int(v):
@@ -275,13 +265,12 @@ def fetch_and_apply(db: Session) -> dict:
 
         new_status = _status_of(g)
 
-        # Keep the kickoff time in sync with Promiedos for matches not yet played
-        # (seed times can be off, e.g. by an hour).
-        if m.status == "scheduled" and new_status == "scheduled":
-            start = _parse_start(g.get("start_time"))
-            if start and m.kickoff_utc != start:
-                m.kickoff_utc = start
-                updated += 1
+        # NOTE: we deliberately DON'T sync kickoff times from Promiedos. Its
+        # `start_time` is localized to the requester's IP geo (Railway resolves to
+        # US Pacific), with no UTC field and no timezone override — so parsing it
+        # as Argentina shifts every match by the geo offset (~-4h in prod). The
+        # seed (hand-entered AR times, reapplied by _sync_kickoffs on each deploy)
+        # is the source of truth for kickoff_utc.
 
         # Orient scores/cards/scorers to our home/away. promiedos team.goals is
         # a list of goal events with player_name.

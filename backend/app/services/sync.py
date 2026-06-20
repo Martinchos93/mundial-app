@@ -140,6 +140,36 @@ def _config_for_match(db: Session, match_id: int) -> dict | None:
     return col.scoring_config if col else None
 
 
+def _prediction_stats(predictions: list) -> dict:
+    """Aggregate prediction stats for a match: 3 most-predicted scorelines and the
+    most-chosen goalscorer. Deduped by user (multi-prode picks count once)."""
+    from app.services.scoring import _name_tokens
+
+    score_users: dict[tuple[int, int], set[int]] = {}
+    scorer_users: dict[str, list] = {}  # normalized name -> [display_name, set(user_id)]
+    for p in predictions:
+        score_users.setdefault((p.pred_home_score, p.pred_away_score), set()).add(p.user_id)
+        for pl in (p.pred_players or []):
+            if int(pl.get("g", 0) or 0) > 0:
+                nm = (pl.get("name") or "").strip()
+                key = " ".join(sorted(_name_tokens(nm)))
+                if not key:
+                    continue
+                entry = scorer_users.setdefault(key, [nm, set()])
+                entry[1].add(p.user_id)
+    top = sorted(score_users.items(), key=lambda kv: (-len(kv[1]), kv[0]))[:3]
+    top_scores = [{"score": f"{h}-{a}", "count": len(u)} for (h, a), u in top]
+    top_scorer = None
+    if scorer_users:
+        nm, us = max(scorer_users.values(), key=lambda v: len(v[1]))
+        top_scorer = {"name": nm, "count": len(us)}
+    return {
+        "voters": len({p.user_id for p in predictions}),
+        "top_scores": top_scores,
+        "top_scorer": top_scorer,
+    }
+
+
 def _score_snapshot(s: Score) -> dict:
     return {
         "pts_result": s.pts_result, "pts_exact": s.pts_exact, "pts_yellows": s.pts_yellows,
@@ -194,6 +224,8 @@ def recalculate_match_scores(
                 old_total=old_snap["total"], new_total=new_snap["total"],
                 old_breakdown=old_snap, new_breakdown=new_snap,
             ))
+    # Aggregate prediction stats (top scorelines + top goalscorer) for the match.
+    match.prediction_stats = _prediction_stats(predictions)
     db.commit()
     return count
 

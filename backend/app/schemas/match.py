@@ -36,6 +36,7 @@ class MatchOut(MatchBase):
     booked: list[str] | None = None
     red_players: list[str] | None = None
     lineups: dict | None = None
+    prediction_stats: dict | None = None
 
 
 class MatchLive(BaseModel):

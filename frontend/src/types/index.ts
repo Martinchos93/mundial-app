@@ -109,6 +109,13 @@ export interface Match {
   ai_prediction?: AIPrediction | null;
   events?: MatchEvent[];
   lineups?: MatchLineups | null;
+  prediction_stats?: PredictionStats | null;
+}
+
+export interface PredictionStats {
+  voters: number;
+  top_scores: { score: string; count: number }[];
+  top_scorer: { name: string; count: number } | null;
 }
 
 export interface LineupStarter {

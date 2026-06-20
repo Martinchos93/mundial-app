@@ -7,6 +7,7 @@ import AccountButton from "@/components/account/AccountButton";
 import ContactButton from "@/components/account/ContactButton";
 import MatchCard from "@/components/match/MatchCard";
 import MatchAccordion from "@/components/match/MatchAccordion";
+import MatchPredictionStats from "@/components/match/MatchPredictionStats";
 import PredictionForm from "@/components/prode/PredictionForm";
 import TopScorerCard from "@/components/prode/TopScorerCard";
 import ChampionCard from "@/components/prode/ChampionCard";
@@ -61,6 +62,17 @@ export default function ProdePage() {
     return (columns.find((c) => c.status === "active") ?? columns[0]).id;
   }, [columns]);
 
+  // Most-recent finished match(es) with prediction stats (both if same kickoff).
+  const lastMatches = useMemo(() => {
+    const fin = (matches ?? []).filter(
+      (m) => m.status === "finished" && (m.prediction_stats?.top_scores?.length ?? 0) > 0,
+    );
+    if (fin.length === 0) return [];
+    fin.sort((a, b) => new Date(b.kickoff_at).getTime() - new Date(a.kickoff_at).getTime());
+    const latest = fin[0].kickoff_at;
+    return fin.filter((m) => m.kickoff_at === latest);
+  }, [matches]);
+
   function switchProde(id: number) {
     setGroupId(id);
     setSelectedGroupId(id);
@@ -96,6 +108,20 @@ export default function ProdePage() {
         <PollCard />
         {groupId && <GroupLeaderboardCard groupId={Number(groupId)} userId={Number(getUserId()) || 0} />}
         <GlobalRankingCard userId={Number(getUserId()) || 0} />
+
+        {lastMatches.length > 0 && (
+          <div className="mb-4">
+            <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-gray-400">
+              Resumen del último partido
+            </p>
+            <div className="space-y-2.5">
+              {lastMatches.map((m) => (
+                <MatchPredictionStats key={m.id} match={m} showHeader />
+              ))}
+            </div>
+          </div>
+        )}
+
         <ScoringLegend />
         <ChampionCard columnId={columnId} />
         <TopScorerCard columnId={columnId} />

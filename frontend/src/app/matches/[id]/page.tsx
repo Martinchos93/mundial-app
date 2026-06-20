@@ -7,6 +7,7 @@ import Navbar from "@/components/layout/Navbar";
 import LiveStats from "@/components/match/LiveStats";
 import Lineups from "@/components/match/Lineups";
 import AIPredictionCard from "@/components/match/AIPredictionCard";
+import MatchPredictionStats from "@/components/match/MatchPredictionStats";
 import PredictionForm from "@/components/prode/PredictionForm";
 import { formatFullDate } from "@/lib/utils";
 import type { MatchEvent } from "@/types";
@@ -161,6 +162,13 @@ export default function MatchDetailPage({ params }: { params: { id: string } }) 
             <Section title="Tu predicción">
               <PredictionForm match={match} existing={existing} columnId={columnId} />
             </Section>
+
+            {/* Aggregated prediction stats (after the match) */}
+            {match.status === "finished" && (match.prediction_stats?.top_scores?.length ?? 0) > 0 && (
+              <Section title="Estadísticas de predicciones">
+                <MatchPredictionStats match={match} />
+              </Section>
+            )}
           </div>
         )}
       </main>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, memo, useCallback, useMemo, useRef } from "react";
+import { Fragment, memo, useCallback, useMemo, type Dispatch, type SetStateAction } from "react";
 import { Minus, Plus } from "lucide-react";
 import { useSquad, type SquadPlayer } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -13,7 +13,7 @@ interface Props {
   homeTeam: string;
   awayTeam: string;
   value: EventMap;
-  onChange: (next: EventMap) => void;
+  onChange: Dispatch<SetStateAction<EventMap>>;
   disabled?: boolean;
   /** Predicted scoreline — goals assigned to each team's players can't exceed it. */
   homeGoals?: number;
@@ -119,13 +119,15 @@ export default function PlayerEventsTable({
   const { data: home } = useSquad(homeTeam || null);
   const { data: away } = useSquad(awayTeam || null);
 
-  // Stable setter — keeps PlayerRow memoization intact across renders.
-  const valueRef = useRef(value);
-  valueRef.current = value;
+  // Stable setter (keeps PlayerRow memoization) that uses React's FUNCTIONAL
+  // updater, so two quick taps on different players both land — a value-ref here
+  // saw stale state between renders and silently dropped the first pick.
   const setField = useCallback<SetField>(
     (p, team, field, v) => {
-      const cur = valueRef.current[p.name] ?? { name: p.name, team, g: 0, y: 0, r: 0 };
-      onChange({ ...valueRef.current, [p.name]: { ...cur, name: p.name, team, [field]: v } });
+      onChange((prev) => {
+        const cur = prev[p.name] ?? { name: p.name, team, g: 0, y: 0, r: 0 };
+        return { ...prev, [p.name]: { ...cur, name: p.name, team, [field]: v } };
+      });
     },
     [onChange],
   );

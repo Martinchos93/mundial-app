@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn, isAdmin, getUserId } from "@/lib/utils";
@@ -27,7 +28,12 @@ const TABS: Tab[] = [
 export default function Navbar() {
   const pathname = usePathname();
   const [admin, setAdmin] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const { data: settings } = useSettings();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Read admin status after mount (localStorage is client-only); re-check on
   // navigation so it updates right after login/logout.
@@ -39,8 +45,12 @@ export default function Navbar() {
   const futgolfOk = !!settings?.futgolf_enabled && (settings?.futgolf_all || admin || (settings?.futgolf_allowed ?? []).includes(myId));
   const tabs = TABS.filter((t) => (!t.adminOnly || admin) && (!t.futgolfOnly || futgolfOk));
 
-  return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white">
+  const nav = (
+    // Portaled to <body> so it stays pinned to the viewport even on iOS Chrome,
+    // where an ancestor's transform/filter would otherwise detach `fixed`.
+    <nav
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)]"
+    >
       <div className="mx-auto flex max-w-lg">
         {tabs.map(({ href, label, icon }) => {
           const active = pathname === href || pathname.startsWith(`${href}/`);
@@ -61,4 +71,7 @@ export default function Navbar() {
       </div>
     </nav>
   );
+
+  if (!mounted) return null;
+  return createPortal(nav, document.body);
 }

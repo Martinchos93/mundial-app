@@ -411,6 +411,25 @@ export default function PredictionForm({ match, existing, columnId, onSaved }: P
         </div>
       )}
 
+      {/* Cerrado: mostrar tus picks de jugadores en solo lectura */}
+      {locked && picks.length > 0 && (
+        <div className="mb-3 rounded-lg border border-gray-100 bg-gray-50/60 p-3">
+          <div className="mb-1.5 text-[11px] font-medium text-gray-600">⚽🟨🟥 Tus picks de jugadores</div>
+          <ul className="space-y-1">
+            {picks.map((p) => (
+              <li key={p.name} className="flex items-center gap-2 text-[12px] text-gray-700">
+                <span className="truncate">{p.name}</span>
+                <span className="ml-auto flex flex-none items-center gap-2 text-[11px] text-gray-500">
+                  {p.g ? <span>⚽ {p.g}</span> : null}
+                  {p.y ? <span>🟨</span> : null}
+                  {p.r ? <span>🟥</span> : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {aiEnabled && ai && <p className="mb-2.5 text-center text-[11px] text-gray-400">{ai}</p>}
       {error && <p className="mb-2.5 text-center text-xs text-red-500">{error}</p>}
 

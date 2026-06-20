@@ -291,9 +291,19 @@ def fetch_and_apply(db: Session) -> dict:
         # a 90'+ booking that Promiedos posted a beat after the final whistle.
         if m.status == "finished":
             changed_fin = False
-            if not m.scorers and (hg or ag) and m.home_score == hs and m.away_score == as_:
-                m.scorers = (hg + ag) or None
-                changed_fin = True
+            if (hg or ag) and m.home_score == hs and m.away_score == as_:
+                fresh = (hg + ag) or None
+                total = (hs or 0) + (as_ or 0)
+                # Heal a stored list whose count doesn't match the score — e.g. a
+                # later-disallowed goal left a stale scorer (Brazil-Haiti showed
+                # 'Vinicius' AND 'Vinícius Júnior' for a 3-0). Only trust promiedos
+                # when ITS list matches the final score, so we never clobber a
+                # correct (manual) result with partial data.
+                stored_bad = m.scorers is not None and len(m.scorers) != total
+                promiedos_clean = len(hg) + len(ag) == total
+                if (not m.scorers or stored_bad) and promiedos_clean and fresh != (m.scorers or None):
+                    m.scorers = fresh
+                    changed_fin = True
             # Fetch the detail page if we're missing yellows (never captured) or
             # lineups — fills late bookings and backfills formations for old games.
             need_yellows = (m.home_yellows or 0) == 0 and (m.away_yellows or 0) == 0

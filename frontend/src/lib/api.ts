@@ -1015,6 +1015,11 @@ export async function recalculateAll(): Promise<{ matches: number; recalculated_
   return res.data;
 }
 
+export async function recalculateMatch(matchId: number): Promise<{ match_id: number; recalculated_predictions: number }> {
+  const res = await http.post(`/admin/matches/${matchId}/recalculate`);
+  return res.data;
+}
+
 export async function backfillPicks(): Promise<{ top_scorer_filled: number; champion_filled: number; users: number }> {
   const res = await http.post(`/admin/backfill-picks`);
   return res.data;

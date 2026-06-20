@@ -12,6 +12,7 @@ import {
   deleteNews,
   syncSquads,
   recalculateAll,
+  recalculateMatch,
   backfillPicks,
   useAdmins,
   createAdmin,
@@ -846,6 +847,21 @@ function ResultsManager() {
     }
   }
 
+  async function recalc() {
+    if (!sel) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await recalculateMatch(sel.id);
+      setMsg(`🔄 ${res.recalculated_predictions} predicciones recalculadas (sin tocar el resultado)`);
+      await mutate();
+    } catch {
+      setMsg("No se pudo recalcular.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function undo() {
     if (!sel) return;
     if (!window.confirm("¿Borrar el resultado de este partido? Vuelve a 'sin jugar' y se quitan los puntos que sumó.")) return;
@@ -959,6 +975,15 @@ function ResultsManager() {
           >
             {busy ? "Guardando…" : sel.status === "finished" ? "Actualizar resultado" : "Guardar y contabilizar puntos"}
           </button>
+          {sel.status === "finished" && (
+            <button
+              onClick={recalc}
+              disabled={busy}
+              className="mt-2 w-full rounded-[10px] border border-blue-200 py-2 text-[13px] font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-60"
+            >
+              🔄 Recalcular este partido (sin tocar el resultado)
+            </button>
+          )}
           {sel.status === "finished" && (
             <button
               onClick={undo}

@@ -269,6 +269,20 @@ def recalculate_all(db: Session = Depends(get_db)):
     return {"matches": len(matches), "recalculated_predictions": total}
 
 
+@router.post("/matches/{match_id}/recalculate")
+def recalculate_match(match_id: int, db: Session = Depends(get_db)):
+    """Re-score every prediction on ONE finished match WITHOUT touching the
+    result/goalscorers/cards — just re-tallies points against the data already
+    stored. Targeted + safe alternative to "Recalcular TODO" (lighter on the DB)."""
+    m = db.get(Match, match_id)
+    if m is None:
+        raise HTTPException(status_code=404, detail="Match not found")
+    if m.status != "finished":
+        raise HTTPException(status_code=400, detail="El partido no está terminado")
+    n = recalculate_match_scores(db, m)  # commits internally
+    return {"match_id": m.id, "recalculated_predictions": n}
+
+
 class MatchResultIn(BaseModel):
     home_score: int = Field(..., ge=0, le=30)
     away_score: int = Field(..., ge=0, le=30)

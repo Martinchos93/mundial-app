@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
 import AccountButton from "@/components/account/AccountButton";
+import ContactButton from "@/components/account/ContactButton";
 import BracketView from "@/components/bracket/BracketView";
 import TournamentStats from "@/components/stats/TournamentStats";
 import { useStandings } from "@/lib/api";
@@ -64,7 +65,10 @@ export default function TeamsPage() {
             </h1>
             <p className="text-[11px] text-gray-400">Mundial 2026</p>
           </div>
-          <AccountButton />
+          <div className="flex items-center gap-1">
+            <ContactButton />
+            <AccountButton />
+          </div>
         </div>
         <div className="grid grid-cols-3 gap-2 rounded-lg bg-gray-100 p-1">
           {(["grupos", "cruces", "stats"] as const).map((v) => (

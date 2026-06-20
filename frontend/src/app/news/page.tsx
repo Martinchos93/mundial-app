@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import AccountButton from "@/components/account/AccountButton";
+import ContactButton from "@/components/account/ContactButton";
 import { useNews } from "@/lib/api";
 import { formatFullDate } from "@/lib/utils";
 
@@ -38,7 +39,10 @@ export default function NewsPage() {
               {total > 0 ? `${total} notas · página ${page} de ${totalPages}` : "Lo último del Mundial 2026"}
             </p>
           </div>
-          <AccountButton />
+          <div className="flex items-center gap-1">
+            <ContactButton />
+            <AccountButton />
+          </div>
         </div>
       </header>
 

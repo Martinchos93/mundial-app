@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import AccountButton from "@/components/account/AccountButton";
+import ContactButton from "@/components/account/ContactButton";
 import Navbar from "@/components/layout/Navbar";
 import MatchCard from "@/components/match/MatchCard";
 import MatchAccordion from "@/components/match/MatchAccordion";
@@ -45,7 +46,10 @@ export default function FixturePage() {
           <h1 className="text-base font-semibold text-gray-900">Mundial 2026 🏆</h1>
           <p className="text-[11px] text-gray-400">Hora local · {timezoneLabel()}</p>
         </div>
-        <AccountButton />
+        <div className="flex items-center gap-1">
+          <ContactButton />
+          <AccountButton />
+        </div>
       </header>
 
       <ProdeSwitcher value={groupId} onChange={switchProde} className="border-b border-gray-100 bg-white px-4 py-2.5" />

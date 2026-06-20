@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
 import AccountButton from "@/components/account/AccountButton";
+import ContactButton from "@/components/account/ContactButton";
 import MatchCard from "@/components/match/MatchCard";
 import MatchAccordion from "@/components/match/MatchAccordion";
 import PredictionForm from "@/components/prode/PredictionForm";
@@ -83,7 +84,10 @@ export default function ProdePage() {
             <h1 className="text-base font-semibold text-gray-900">{group?.name ?? "Prode"}</h1>
             <p className="text-[11px] text-gray-400">Predecí los próximos partidos</p>
           </div>
-          <AccountButton />
+          <div className="flex items-center gap-1">
+            <ContactButton />
+            <AccountButton />
+          </div>
         </div>
         <ProdeSwitcher value={groupId} onChange={switchProde} className="mt-2" />
       </header>

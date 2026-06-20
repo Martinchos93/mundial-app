@@ -16,6 +16,7 @@ from app.schemas.auth import UserOut
 from app.schemas.prediction import PlayerEvent
 from app.security import hash_password
 from app.services.sync import recalculate_column, recalculate_match_scores
+from app.redis_client import bump_matches_cache
 from app.routers.predictions import _user_active_columns
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(get_current_admin)])
@@ -379,6 +380,7 @@ def set_match_result(match_id: int, payload: MatchResultIn, db: Session = Depend
     # Admin is editing the actual result on purpose → allowed to adjust down too.
     recalculated = recalculate_match_scores(db, m, allow_decrease=True, source="manual_result") if m.status == "finished" else 0
     db.commit()
+    bump_matches_cache()
 
     # Propagate into the knockout bracket (best-effort).
     try:
@@ -416,6 +418,7 @@ def reset_match_result(match_id: int, db: Session = Depends(get_db)):
     m.scorers = m.booked = m.red_players = None
     m.home_yellows = m.home_reds = m.away_yellows = m.away_reds = 0
     db.commit()
+    bump_matches_cache()
 
     # Re-resolve the bracket from whatever is still finished.
     try:

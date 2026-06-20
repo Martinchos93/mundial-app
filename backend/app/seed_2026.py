@@ -249,6 +249,12 @@ def sync_kickoffs() -> int:
                 m.venue = venue
                 updated += 1
         db.commit()
+        if updated:
+            try:
+                from app.redis_client import bump_matches_cache
+                bump_matches_cache()
+            except Exception:  # noqa: BLE001
+                pass
         return updated
     finally:
         db.close()

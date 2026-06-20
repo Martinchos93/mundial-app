@@ -1,14 +1,20 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Match
 from app.schemas.match import MatchOut, MatchList, MatchLive, MatchEvent, TeamLineup
 from app.services import football_api
+from app.redis_client import matches_cache_version, matches_cache_get, matches_cache_set
 
 router = APIRouter(prefix="/matches", tags=["matches"])
+
+# /matches is the shared heavy read (fixture/prode/detail). Cache the serialized
+# response in Redis with a short TTL; the version key is bumped on any match
+# write so admins/sync see changes immediately (TTL is just a safety net).
+_MATCHES_TTL = 60
 
 
 @router.get("", response_model=MatchList)
@@ -20,6 +26,14 @@ def list_matches(
     page_size: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
 ):
+    ver = matches_cache_version()
+    cache_key = None
+    if ver is not None:
+        cache_key = f"matches:{ver}:{page}:{page_size}:{date or ''}:{phase or ''}:{status or ''}"
+        cached = matches_cache_get(cache_key)
+        if cached is not None:
+            return Response(content=cached, media_type="application/json")
+
     q = db.query(Match)
     if date:
         try:
@@ -41,12 +55,15 @@ def list_matches(
         .limit(page_size)
         .all()
     )
-    return MatchList(
+    payload = MatchList(
         items=[MatchOut.model_validate(m) for m in items],
         total=total,
         page=page,
         page_size=page_size,
     )
+    if cache_key is not None:
+        matches_cache_set(cache_key, payload.model_dump_json(), _MATCHES_TTL)
+    return payload
 
 
 @router.get("/{match_id}", response_model=MatchOut)

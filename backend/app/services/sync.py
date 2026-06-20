@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import SessionLocal
 from app.models import Match, Column, Prediction, Score, ScoreHistory
+from app.redis_client import bump_matches_cache
 from app.services import football_api
 from app.services.scoring import score_prediction
 
@@ -227,6 +228,7 @@ def recalculate_match_scores(
     # Aggregate prediction stats (top scorelines + top goalscorer) for the match.
     match.prediction_stats = _prediction_stats(predictions)
     db.commit()
+    bump_matches_cache()  # prediction_stats changed → invalidate /matches cache
     return count
 
 

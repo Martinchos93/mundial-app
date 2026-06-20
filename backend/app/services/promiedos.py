@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Match, Setting
 from app.services.sync import recalculate_match_scores
+from app.redis_client import bump_matches_cache
 
 logger = logging.getLogger(__name__)
 
@@ -388,4 +389,5 @@ def fetch_and_apply(db: Session) -> dict:
             recalculate_match_scores(db, m, source="sync")
 
     db.commit()
+    bump_matches_cache()  # scores/status/lineups/stats may have changed
     return {"enabled": True, "updated": updated, "games": len(games)}

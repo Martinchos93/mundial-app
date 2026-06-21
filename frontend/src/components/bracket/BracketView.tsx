@@ -37,30 +37,38 @@ function color(no: number): string {
 
 const short = (n: string) => (n.length > 11 ? n.slice(0, 10) + "…" : n);
 
+function SlotRow({
+  team, proj, label, score, finished,
+}: { team: string | null; proj: string | null; label: string; score: number | null; finished: boolean }) {
+  if (team) {
+    return (
+      <div className="flex items-center justify-between gap-1 text-[9px] leading-none">
+        <span className="truncate">{flagFor(team)} {short(team)}</span>
+        {finished && <span className="font-semibold">{score}</span>}
+      </div>
+    );
+  }
+  if (proj) {
+    // Provisional matchup from current group standings (group still in progress).
+    return (
+      <div className="flex items-center gap-1 text-[9px] italic leading-none opacity-70" title="Proyección según los grupos">
+        <span className="truncate">{flagFor(proj)} {short(proj)}</span>
+      </div>
+    );
+  }
+  return <div className="text-[9px] leading-none opacity-90">{label}</div>;
+}
+
 function Pill({ m }: { m?: BracketMatch }) {
   if (!m) return null;
   const finished = m.status === "finished";
-  const resolved = !!m.home_team && !!m.away_team;
-
   return (
     <div className={cn("flex h-[46px] w-[128px] flex-col justify-center rounded-xl px-2 py-1 text-white shadow-sm", color(m.match_no))}>
       <div className="text-[11px] font-bold leading-none">M{m.match_no}</div>
-      {resolved ? (
-        <div className="mt-0.5 space-y-0.5">
-          <div className="flex items-center justify-between gap-1 text-[9px] leading-none">
-            <span className="truncate">{flagFor(m.home_team!)} {short(m.home_team!)}</span>
-            {finished && <span className="font-semibold">{m.home_score}</span>}
-          </div>
-          <div className="flex items-center justify-between gap-1 text-[9px] leading-none">
-            <span className="truncate">{flagFor(m.away_team!)} {short(m.away_team!)}</span>
-            {finished && <span className="font-semibold">{m.away_score}</span>}
-          </div>
-        </div>
-      ) : (
-        <div className="mt-0.5 text-[9px] leading-tight opacity-90">
-          {m.home_label} v {m.away_label}
-        </div>
-      )}
+      <div className="mt-0.5 space-y-0.5">
+        <SlotRow team={m.home_team} proj={m.home_proj} label={m.home_label} score={m.home_score} finished={finished} />
+        <SlotRow team={m.away_team} proj={m.away_proj} label={m.away_label} score={m.away_score} finished={finished} />
+      </div>
     </div>
   );
 }
@@ -151,6 +159,9 @@ export default function BracketView() {
         </div>
       </div>
       <p className="text-center text-[11px] text-gray-400">Deslizá horizontalmente para ver todo el cuadro →</p>
+      <p className="text-center text-[11px] text-gray-400">
+        <span className="italic opacity-70">En itálica</span> = proyección según cómo van los grupos (se actualiza solo).
+      </p>
     </div>
   );
 }

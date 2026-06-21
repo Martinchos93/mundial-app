@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_admin
 from app.models import Match
-from app.services.bracket import resolve
+from app.services.bracket import resolve, project
 
 router = APIRouter(tags=["bracket"])
 
@@ -33,15 +33,22 @@ def bracket(db: Session = Depends(get_db)):
         .order_by(Match.match_no.asc())
         .all()
     )
+    proj = project(db)  # provisional matchups from current group standings
     out: dict[int, dict] = {}
     for m in matches:
+        home = _resolved(m.home_team)
+        away = _resolved(m.away_team)
+        p = proj.get(m.match_no, {})
         out[m.match_no] = {
             "match_no": m.match_no,
             "round": m.phase,
             "home_label": _compact(m.home_source),
             "away_label": _compact(m.away_source),
-            "home_team": _resolved(m.home_team),
-            "away_team": _resolved(m.away_team),
+            "home_team": home,
+            "away_team": away,
+            # Projected team for slots not yet confirmed (group still in progress).
+            "home_proj": None if home else p.get("home"),
+            "away_proj": None if away else p.get("away"),
             "home_score": m.home_score,
             "away_score": m.away_score,
             "status": m.status,

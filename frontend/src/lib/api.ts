@@ -315,6 +315,8 @@ export interface BracketMatch {
   away_label: string;
   home_team: string | null;
   away_team: string | null;
+  home_proj: string | null;
+  away_proj: string | null;
   home_score: number | null;
   away_score: number | null;
   status: string;

@@ -167,6 +167,59 @@ def resolve(db: Session) -> int:
     return updated
 
 
+def project(db: Session) -> dict[int, dict]:
+    """Projected R32 matchups from the CURRENT (provisional) group standings —
+    1st/2nd of each group + the provisional 8 best thirds — without persisting.
+    Updates naturally as group results come in. Knockout-derived slots (MW/ML)
+    can't be projected from groups, so they're left out. Returns
+    {match_no: {home, away}} with projected team names (or None)."""
+    ranked, _complete = _standings(db)
+    winner = {ltr: ranked[ltr][0]["team"] for ltr in GROUP_LETTERS if ranked[ltr]}
+    runner = {ltr: ranked[ltr][1]["team"] for ltr in GROUP_LETTERS if len(ranked[ltr]) > 1}
+
+    thirds = [(ltr, ranked[ltr][2]) for ltr in GROUP_LETTERS if len(ranked[ltr]) > 2]
+    thirds.sort(key=lambda t: (t[1]["pts"], t[1]["gd"], t[1]["gf"], t[1]["fp"]), reverse=True)
+    qualifying = [ltr for ltr, _ in thirds[:8]]
+    third_of = {ltr: ranked[ltr][2]["team"] for ltr in GROUP_LETTERS if len(ranked[ltr]) > 2}
+
+    knockout = (
+        db.query(Match)
+        .filter(Match.match_no.isnot(None), Match.match_no >= 73)
+        .order_by(Match.match_no.asc())
+        .all()
+    )
+    slots = []
+    for m in knockout:
+        t_src = (
+            m.home_source if (m.home_source or "").startswith("T:")
+            else m.away_source if (m.away_source or "").startswith("T:") else None
+        )
+        if t_src:
+            slots.append((m.match_no, set(t_src.split(":")[1])))
+    try:
+        assign = _assign_thirds(slots, qualifying) if qualifying else {}
+    except Exception:  # noqa: BLE001 — provisional data may not form a perfect matching
+        assign = {}
+    third_team = {mn: third_of[g] for mn, g in assign.items() if g in third_of}
+
+    def proj(code: str | None, match_no: int) -> str | None:
+        if not code:
+            return None
+        kind, _, arg = code.partition(":")
+        if kind == "W":
+            return winner.get(arg)
+        if kind == "R":
+            return runner.get(arg)
+        if kind == "T":
+            return third_team.get(match_no)
+        return None  # MW/ML: depends on knockout results, not projectable
+
+    return {
+        m.match_no: {"home": proj(m.home_source, m.match_no), "away": proj(m.away_source, m.match_no)}
+        for m in knockout
+    }
+
+
 # ---- Demo simulation -----------------------------------------------------
 
 # Rough strength tiers used only to produce a plausible simulated tournament.

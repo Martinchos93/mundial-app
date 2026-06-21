@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_admin
 from app.models import ContactMessage
+from app.services.email import send_contact_reply
 
 router = APIRouter(tags=["contact"])
 admin_router = APIRouter(prefix="/admin", tags=["contact"], dependencies=[Depends(get_current_admin)])
@@ -53,6 +54,25 @@ def mark_all_read(db: Session = Depends(get_db)):
     )
     db.commit()
     return {"updated": int(n or 0)}
+
+
+class ReplyIn(BaseModel):
+    text: str = Field(..., min_length=1, max_length=4000)
+
+
+@admin_router.post("/contact/{msg_id}/reply")
+def reply_contact(msg_id: int, payload: ReplyIn, db: Session = Depends(get_db)):
+    """Email the user a reply (from the no-reply address; the footer tells them to
+    write back from the platform). Marks the message as handled."""
+    m = db.get(ContactMessage, msg_id)
+    if m is None:
+        raise HTTPException(status_code=404, detail="Message not found")
+    ok = send_contact_reply(m.email, m.name, payload.text.strip())
+    if not ok:
+        raise HTTPException(status_code=502, detail="No se pudo enviar el mail")
+    m.handled = True
+    db.commit()
+    return {"sent": True}
 
 
 @admin_router.post("/contact/{msg_id}/handled", response_model=ContactOut)

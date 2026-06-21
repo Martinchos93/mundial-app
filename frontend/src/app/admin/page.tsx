@@ -37,6 +37,7 @@ import {
   toggleContactHandled,
   markAllContactRead,
   deleteContact,
+  replyContact,
   useActiveUsers,
 } from "@/lib/api";
 import PlayerEventsTable, { type EventMap } from "@/components/prode/PlayerEventsTable";
@@ -417,6 +418,27 @@ function ContactManager() {
   const messages = data ?? [];
   const pending = messages.filter((m) => !m.handled).length;
   const autoRead = useRef(false);
+  const [replyTo, setReplyTo] = useState<number | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sentMsg, setSentMsg] = useState<number | null>(null);
+
+  async function sendReply(id: number) {
+    if (!replyText.trim() || sending) return;
+    setSending(true);
+    try {
+      await replyContact(id, replyText.trim());
+      setReplyTo(null);
+      setReplyText("");
+      setSentMsg(id);
+      setTimeout(() => setSentMsg(null), 3000);
+      mutate();
+    } catch {
+      window.alert("No se pudo enviar el mail. Probá de nuevo.");
+    } finally {
+      setSending(false);
+    }
+  }
 
   // Mark everything as read once the inbox is opened/loaded.
   useEffect(() => {
@@ -478,19 +500,42 @@ function ContactManager() {
             </div>
             <p className="mt-1.5 whitespace-pre-wrap text-[12.5px] text-gray-700">{m.message}</p>
             <div className="mt-2 flex items-center gap-2">
-              <a
-                href={`mailto:${m.email}?subject=Re: tu mensaje en ProdeGoat`}
+              <button
+                onClick={() => { setReplyTo(replyTo === m.id ? null : m.id); setReplyText(""); }}
                 className="rounded-lg bg-blue-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-blue-700"
               >
-                Responder
-              </a>
+                {replyTo === m.id ? "Cancelar" : "Responder"}
+              </button>
               <button onClick={() => toggle(m.id)} className="rounded-lg border border-gray-200 px-2.5 py-1 text-[11px] text-gray-600 hover:bg-gray-50">
                 {m.handled ? "Marcar sin leer" : "Marcar leído"}
               </button>
+              {sentMsg === m.id && <span className="text-[11px] font-medium text-green-600">✅ Enviado</span>}
               <button onClick={() => remove(m.id)} className="ml-auto text-[11px] text-gray-400 hover:text-red-500">
                 Borrar
               </button>
             </div>
+            {replyTo === m.id && (
+              <div className="mt-2">
+                <textarea
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value.slice(0, 4000))}
+                  placeholder={`Respuesta para ${m.name}… (se envía por email desde ProdeGoat)`}
+                  rows={3}
+                  className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-[12.5px] focus:border-blue-400 focus:outline-none"
+                  autoFocus
+                />
+                <div className="mt-1.5 flex items-center justify-between">
+                  <span className="text-[10px] text-gray-400">Le llega a {m.email}. No-reply: se le pide responder desde la app.</span>
+                  <button
+                    onClick={() => sendReply(m.id)}
+                    disabled={sending || !replyText.trim()}
+                    className="rounded-lg bg-blue-600 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {sending ? "Enviando…" : "Enviar respuesta"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>

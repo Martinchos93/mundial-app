@@ -836,6 +836,10 @@ export async function deleteContact(id: number): Promise<void> {
   await http.delete(`/admin/contact/${id}`);
 }
 
+export async function replyContact(id: number, text: string): Promise<void> {
+  await http.post(`/admin/contact/${id}/reply`, { text });
+}
+
 export interface PlayerSearchResult {
   id: number;
   name: string;

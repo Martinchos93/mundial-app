@@ -53,3 +53,24 @@ def send_password_reset(to: str, first_name: str, reset_url: str) -> bool:
   <p style="font-size:12px;color:#9ca3af;word-break:break-all">O pegá este link en tu navegador:<br>{reset_url}</p>
 </div>"""
     return _send(to, "Restablecé tu contraseña · ProdeGoat", html)
+
+
+def send_contact_reply(to: str, name: str, reply: str) -> bool:
+    """Reply to a contact-form message. Sent from the no-reply address, so the
+    footer tells the user to write back from the platform (this inbox doesn't
+    receive)."""
+    who = name or "crack"
+    body = (reply or "").strip().replace("\n", "<br>")
+    html = f"""\
+<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#1f2937">
+  <div style="text-align:center;font-size:40px">🏆</div>
+  <h1 style="font-size:20px;text-align:center;margin:8px 0 4px">ProdeGoat</h1>
+  <p style="font-size:15px;line-height:1.5">Hola {who}, gracias por escribirnos. Te respondemos:</p>
+  <div style="background:#f3f4f6;border-radius:10px;padding:14px 16px;font-size:15px;line-height:1.55;white-space:pre-line">{body}</div>
+  <p style="font-size:13px;color:#6b7280;line-height:1.5;margin-top:20px">
+    📩 Este correo se envía desde una casilla que <b>no recibe respuestas</b>.
+    Si necesitás escribirnos de nuevo, hacelo desde la plataforma con el botón
+    <b>“?”</b> arriba a la derecha.
+  </p>
+</div>"""
+    return _send(to, "Respuesta de ProdeGoat", html)

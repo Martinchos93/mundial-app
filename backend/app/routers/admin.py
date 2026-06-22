@@ -349,28 +349,40 @@ def lastday_summary(db: Session = Depends(get_db)):
         seen.setdefault((uid, mid), s)
 
     total = len(seen)
-    r = ex = cards = scorers = 0
+    r = ex = cards = scorers = 0           # nº de pronósticos que sumaron en cada cat.
+    pr = pex = pcards = pscorers = 0       # puntos totales aportados por cada cat.
     for s in seen.values():
-        if (s.pts_result or 0) > 0:
+        cat_result = s.pts_result or 0
+        cat_exact = (s.pts_exact or 0) + (s.pts_bonus or 0)
+        cat_cards = (s.pts_yellows or 0) + (s.pts_reds or 0) + (s.pts_cards or 0)
+        cat_scorers = s.pts_scorers or 0
+        if cat_result > 0:
             r += 1
-        if (s.pts_exact or 0) > 0:
+        if cat_exact > 0:
             ex += 1
-        if (s.pts_yellows or 0) + (s.pts_reds or 0) + (s.pts_cards or 0) > 0:
+        if cat_cards > 0:
             cards += 1
-        if (s.pts_scorers or 0) > 0:
+        if cat_scorers > 0:
             scorers += 1
+        pr += cat_result; pex += cat_exact; pcards += cat_cards; pscorers += cat_scorers
+
+    total_points = pr + pex + pcards + pscorers
 
     def pct(n: int) -> int:
         return round(n * 100 / total) if total else 0
+
+    def ppct(p: int) -> int:
+        return round(p * 100 / total_points) if total_points else 0
 
     return {
         "day": last,
         "matches": [f"{m.home_team} {m.home_score}-{m.away_score} {m.away_team}" for m in day_matches],
         "total": total,
-        "result": {"count": r, "pct": pct(r)},
-        "exact": {"count": ex, "pct": pct(ex)},
-        "cards": {"count": cards, "pct": pct(cards)},
-        "scorers": {"count": scorers, "pct": pct(scorers)},
+        "total_points": total_points,
+        "result": {"count": r, "pct": pct(r), "points": pr, "points_pct": ppct(pr)},
+        "exact": {"count": ex, "pct": pct(ex), "points": pex, "points_pct": ppct(pex)},
+        "cards": {"count": cards, "pct": pct(cards), "points": pcards, "points_pct": ppct(pcards)},
+        "scorers": {"count": scorers, "pct": pct(scorers), "points": pscorers, "points_pct": ppct(pscorers)},
     }
 
 

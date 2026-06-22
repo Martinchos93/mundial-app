@@ -418,31 +418,50 @@ function LastdaySummaryCard() {
   const { data } = useLastdaySummary();
   const [open, setOpen] = useState(false);
   if (!data || !data.day || data.total === 0) return null;
-  const stats = [
-    { label: "Acertaron el resultado (1X2)", v: data.result },
-    { label: "Acertaron marcador exacto", v: data.exact },
-    { label: "Sumaron por tarjetas", v: data.cards },
-    { label: "Sumaron goles a jugadores", v: data.scorers },
+  const cats = [
+    { label: "Resultado (1X2)", v: data.result },
+    { label: "Marcador exacto", v: data.exact },
+    { label: "Tarjetas", v: data.cards },
+    { label: "Goles a jugadores", v: data.scorers },
   ];
+  // % de usuarios que sumaron en cada categoría
+  const byUsers = cats;
+  // de dónde salen los puntos (ordenado: el que más aporta arriba)
+  const byPoints = [...cats].sort((a, b) => b.v.points - a.v.points);
+
   return (
     <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3.5">
       <div className="text-[13px] font-medium text-gray-900">📊 Resumen de la última fecha</div>
       <p className="mb-2.5 text-[11px] text-gray-400">
-        {data.matches.length} partido{data.matches.length === 1 ? "" : "s"} · {data.total} pronósticos (1 por usuario/partido)
+        {data.matches.length} partido{data.matches.length === 1 ? "" : "s"} · {data.total} pronósticos · {data.total_points} pts repartidos
       </p>
-      <div className="space-y-2">
-        {stats.map((s) => (
+
+      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">% que sumó en cada opción</p>
+      <div className="space-y-1.5">
+        {byUsers.map((s) => (
           <div key={s.label} className="relative overflow-hidden rounded-lg border border-gray-100 bg-gray-50">
             <div className="absolute inset-y-0 left-0 bg-blue-100" style={{ width: `${s.v.pct}%` }} />
-            <div className="relative flex items-center justify-between px-3 py-2 text-[12.5px]">
+            <div className="relative flex items-center justify-between px-3 py-1.5 text-[12.5px]">
               <span className="text-gray-700">{s.label}</span>
-              <span className="font-bold text-gray-900">
-                {s.v.pct}% <span className="font-normal text-gray-400">({s.v.count})</span>
-              </span>
+              <span className="font-bold text-gray-900">{s.v.pct}% <span className="font-normal text-gray-400">({s.v.count})</span></span>
             </div>
           </div>
         ))}
       </div>
+
+      <p className="mb-1 mt-3 text-[11px] font-semibold uppercase tracking-wide text-gray-400">De dónde salen los puntos</p>
+      <div className="space-y-1.5">
+        {byPoints.map((s, i) => (
+          <div key={s.label} className="relative overflow-hidden rounded-lg border border-gray-100 bg-gray-50">
+            <div className={cn("absolute inset-y-0 left-0", i === 0 ? "bg-green-200/70" : "bg-emerald-100")} style={{ width: `${s.v.points_pct}%` }} />
+            <div className="relative flex items-center justify-between px-3 py-1.5 text-[12.5px]">
+              <span className="text-gray-700">{i === 0 && "🥇 "}{s.label}</span>
+              <span className="font-bold text-gray-900">{s.v.points} pts <span className="font-normal text-gray-400">({s.v.points_pct}%)</span></span>
+            </div>
+          </div>
+        ))}
+      </div>
+
       <button onClick={() => setOpen((o) => !o)} className="mt-2 text-[11px] text-blue-600">
         {open ? "Ocultar partidos" : "Ver partidos de la fecha"}
       </button>

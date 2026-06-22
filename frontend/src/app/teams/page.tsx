@@ -128,7 +128,7 @@ export default function TeamsPage() {
         )}
 
         {!isLoading && !error && (
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
             <table className="w-full border-collapse text-xs">
               <thead>
                 <tr className="text-[10px] uppercase text-gray-400">
@@ -137,8 +137,12 @@ export default function TeamsPage() {
                   <th className="border-b border-gray-100 px-1 font-medium">G</th>
                   <th className="border-b border-gray-100 px-1 font-medium">E</th>
                   <th className="border-b border-gray-100 px-1 font-medium">P</th>
-                  <th className="border-b border-gray-100 px-1 font-medium">GD</th>
+                  <th className="border-b border-gray-100 px-1 font-medium">GF</th>
+                  <th className="border-b border-gray-100 px-1 font-medium">GC</th>
+                  <th className="border-b border-gray-100 px-1 font-medium">DG</th>
                   <th className="border-b border-gray-100 px-1 font-medium">Pts</th>
+                  <th className="border-b border-gray-100 px-1 font-medium">🟨</th>
+                  <th className="border-b border-gray-100 px-1 font-medium">🟥</th>
                   <th className="border-b border-gray-100 px-1 font-medium">Forma</th>
                 </tr>
               </thead>
@@ -171,8 +175,12 @@ export default function TeamsPage() {
                       <td className={cn("border-b border-gray-50 px-1 text-center text-gray-500", qbg)}>{t.wins ?? 0}</td>
                       <td className={cn("border-b border-gray-50 px-1 text-center text-gray-500", qbg)}>{t.draws ?? 0}</td>
                       <td className={cn("border-b border-gray-50 px-1 text-center text-gray-500", qbg)}>{t.losses ?? 0}</td>
+                      <td className={cn("border-b border-gray-50 px-1 text-center text-gray-500", qbg)}>{t.goals_for ?? 0}</td>
+                      <td className={cn("border-b border-gray-50 px-1 text-center text-gray-500", qbg)}>{t.goals_against ?? 0}</td>
                       <td className={cn("border-b border-gray-50 px-1 text-center text-gray-500", qbg)}>{t.goal_difference ?? 0}</td>
                       <td className={cn("border-b border-gray-50 px-1 text-center font-bold text-gray-900", qbg)}>{t.points ?? 0}</td>
+                      <td className={cn("border-b border-gray-50 px-1 text-center text-gray-500", qbg)}>{t.yellows ?? 0}</td>
+                      <td className={cn("border-b border-gray-50 px-1 text-center text-gray-500", qbg)}>{t.reds ?? 0}</td>
                       <td className={cn("border-b border-gray-50 px-1", qbg)}>
                         <FormPills form={t.form} />
                       </td>
@@ -181,7 +189,7 @@ export default function TeamsPage() {
                 })}
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-sm text-gray-400">
+                    <td colSpan={12} className="py-8 text-center text-sm text-gray-400">
                       Sin datos para el grupo {selected}.
                     </td>
                   </tr>
@@ -193,6 +201,9 @@ export default function TeamsPage() {
 
         <p className="mt-2 text-center text-[11px] text-gray-400">
           🟢 Clasifican 1° y 2° · 🔵 mejores 8 terceros (32 a dieciseisavos)
+        </p>
+        <p className="mt-1 text-center text-[10px] text-gray-400">
+          Desempate: Pts → dif. de gol → goles a favor → fair-play (menos tarjetas)
         </p>
       </main>
 

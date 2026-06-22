@@ -47,6 +47,9 @@ export interface Team {
   possession?: number;
   goals_for?: number;
   goals_against?: number;
+  yellows?: number;
+  reds?: number;
+  fair_play?: number;
 }
 
 export interface MatchEvent {

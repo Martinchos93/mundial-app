@@ -38,6 +38,7 @@ import {
   markAllContactRead,
   deleteContact,
   replyContact,
+  useLastdaySummary,
   useActiveUsers,
 } from "@/lib/api";
 import PlayerEventsTable, { type EventMap } from "@/components/prode/PlayerEventsTable";
@@ -409,6 +410,47 @@ function ActiveUsersCard() {
         {stat(data?.today, "hoy")}
         {stat(data?.total, "registrados")}
       </div>
+    </div>
+  );
+}
+
+function LastdaySummaryCard() {
+  const { data } = useLastdaySummary();
+  const [open, setOpen] = useState(false);
+  if (!data || !data.day || data.total === 0) return null;
+  const stats = [
+    { label: "Acertaron el resultado (1X2)", v: data.result },
+    { label: "Acertaron marcador exacto", v: data.exact },
+    { label: "Sumaron por tarjetas", v: data.cards },
+    { label: "Sumaron goles a jugadores", v: data.scorers },
+  ];
+  return (
+    <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3.5">
+      <div className="text-[13px] font-medium text-gray-900">📊 Resumen de la última fecha</div>
+      <p className="mb-2.5 text-[11px] text-gray-400">
+        {data.matches.length} partido{data.matches.length === 1 ? "" : "s"} · {data.total} pronósticos (1 por usuario/partido)
+      </p>
+      <div className="space-y-2">
+        {stats.map((s) => (
+          <div key={s.label} className="relative overflow-hidden rounded-lg border border-gray-100 bg-gray-50">
+            <div className="absolute inset-y-0 left-0 bg-blue-100" style={{ width: `${s.v.pct}%` }} />
+            <div className="relative flex items-center justify-between px-3 py-2 text-[12.5px]">
+              <span className="text-gray-700">{s.label}</span>
+              <span className="font-bold text-gray-900">
+                {s.v.pct}% <span className="font-normal text-gray-400">({s.v.count})</span>
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <button onClick={() => setOpen((o) => !o)} className="mt-2 text-[11px] text-blue-600">
+        {open ? "Ocultar partidos" : "Ver partidos de la fecha"}
+      </button>
+      {open && (
+        <ul className="mt-1 space-y-0.5 text-[11.5px] text-gray-600">
+          {data.matches.map((m, i) => <li key={i}>· {m}</li>)}
+        </ul>
+      )}
     </div>
   );
 }
@@ -1172,6 +1214,7 @@ export default function AdminPage() {
 
       <main className="px-4 pb-24 pt-3">
         <ActiveUsersCard />
+        <LastdaySummaryCard />
         <ContactManager />
         <SettingsManager />
         <PollManager />

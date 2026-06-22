@@ -842,6 +842,19 @@ export async function replyContact(id: number, text: string): Promise<void> {
   await http.post(`/admin/contact/${id}/reply`, { text });
 }
 
+export interface LastdaySummary {
+  day: string | null;
+  matches: string[];
+  total: number;
+  result: { count: number; pct: number };
+  exact: { count: number; pct: number };
+  cards: { count: number; pct: number };
+  scorers: { count: number; pct: number };
+}
+export function useLastdaySummary() {
+  return useSWR<LastdaySummary>("/admin/lastday-summary", (url: string) => http.get(url).then((r) => r.data));
+}
+
 export interface PlayerSearchResult {
   id: number;
   name: string;

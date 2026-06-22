@@ -315,6 +315,65 @@ def score_history(limit: int = 200, db: Session = Depends(get_db)):
     ]
 
 
+@router.get("/lastday-summary")
+def lastday_summary(db: Session = Depends(get_db)):
+    """Stats for the most recent matchday (AR day with finished matches): what %
+    of predictions scored by result, exact score, cards, and player goals.
+    Deduped by (user, match) so multi-prode picks count once."""
+    from datetime import timedelta, timezone
+
+    ar = timezone(timedelta(hours=-3))
+    finished = (
+        db.query(Match)
+        .filter(Match.status == "finished", Match.home_score.isnot(None))
+        .all()
+    )
+    if not finished:
+        return {"day": None, "matches": [], "total": 0}
+
+    def ar_day(m):
+        return m.kickoff_utc.astimezone(ar).date().isoformat()
+
+    last = max(ar_day(m) for m in finished)
+    day_matches = sorted((m for m in finished if ar_day(m) == last), key=lambda m: m.kickoff_utc)
+    mids = [m.id for m in day_matches]
+
+    rows = (
+        db.query(Prediction.user_id, Prediction.match_id, Score)
+        .join(Score, Score.prediction_id == Prediction.id)
+        .filter(Prediction.match_id.in_(mids))
+        .all()
+    )
+    seen: dict[tuple[int, int], Score] = {}
+    for uid, mid, s in rows:
+        seen.setdefault((uid, mid), s)
+
+    total = len(seen)
+    r = ex = cards = scorers = 0
+    for s in seen.values():
+        if (s.pts_result or 0) > 0:
+            r += 1
+        if (s.pts_exact or 0) > 0:
+            ex += 1
+        if (s.pts_yellows or 0) + (s.pts_reds or 0) + (s.pts_cards or 0) > 0:
+            cards += 1
+        if (s.pts_scorers or 0) > 0:
+            scorers += 1
+
+    def pct(n: int) -> int:
+        return round(n * 100 / total) if total else 0
+
+    return {
+        "day": last,
+        "matches": [f"{m.home_team} {m.home_score}-{m.away_score} {m.away_team}" for m in day_matches],
+        "total": total,
+        "result": {"count": r, "pct": pct(r)},
+        "exact": {"count": ex, "pct": pct(ex)},
+        "cards": {"count": cards, "pct": pct(cards)},
+        "scorers": {"count": scorers, "pct": pct(scorers)},
+    }
+
+
 class MatchResultIn(BaseModel):
     home_score: int = Field(..., ge=0, le=30)
     away_score: int = Field(..., ge=0, le=30)

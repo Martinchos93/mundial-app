@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Match, Player
 from app.seed_2026 import label_for_source
+from app.services.standings_util import rank_group
 
 GROUP_LETTERS = list("ABCDEFGHIJKL")
 
@@ -31,6 +32,7 @@ def _standings(db: Session):
     table: dict[str, dict[str, dict]] = {ltr: {} for ltr in GROUP_LETTERS}
     counts: dict[str, int] = {ltr: 0 for ltr in GROUP_LETTERS}
     finished: dict[str, int] = {ltr: 0 for ltr in GROUP_LETTERS}
+    group_matches: dict[str, list[tuple]] = {ltr: [] for ltr in GROUP_LETTERS}
 
     for m in db.query(Match).filter(Match.phase.ilike("Grupo %")).all():
         ltr = _group_letter(m.phase)
@@ -44,6 +46,7 @@ def _standings(db: Session):
             continue
         finished[ltr] += 1
         hs, as_ = m.home_score, m.away_score
+        group_matches[ltr].append((m.home_team, m.away_team, hs, as_))
         h, a = g[m.home_team], g[m.away_team]
         h["gf"] += hs; h["gd"] += hs - as_
         a["gf"] += as_; a["gd"] += as_ - hs
@@ -60,10 +63,10 @@ def _standings(db: Session):
     ranked: dict[str, list[dict]] = {}
     complete: dict[str, bool] = {}
     for ltr in GROUP_LETTERS:
-        rows = sorted(
-            table[ltr].values(), key=lambda r: (r["pts"], r["gd"], r["gf"], r["fp"]), reverse=True
+        ranked[ltr] = rank_group(
+            list(table[ltr].values()), group_matches[ltr],
+            name="team", points="pts", gd="gd", gf="gf", fp="fp",
         )
-        ranked[ltr] = rows
         complete[ltr] = counts[ltr] > 0 and finished[ltr] == counts[ltr]
     return ranked, complete
 

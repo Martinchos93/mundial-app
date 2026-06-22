@@ -50,9 +50,10 @@ export default function TeamsPage() {
   const selected = groups.includes(active) ? active : groups[0];
 
   const rows = useMemo(() => {
+    // Use the API's official rank (head-to-head aware, FIFA Art. 13).
     return (data ?? [])
       .filter((t) => t.group === selected)
-      .sort((a, b) => (b.points ?? 0) - (a.points ?? 0) || (b.goal_difference ?? 0) - (a.goal_difference ?? 0));
+      .sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99));
   }, [data, selected]);
 
   return (

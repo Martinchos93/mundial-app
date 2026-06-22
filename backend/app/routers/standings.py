@@ -5,6 +5,7 @@ from app.config import settings
 from app.database import get_db
 from app.models import Match
 from app.services import football_api
+from app.services.standings_util import rank_group
 
 router = APIRouter(tags=["standings"])
 
@@ -72,6 +73,7 @@ def _derive_from_matches(db: Session) -> list[dict]:
             }
         return table[key]
 
+    group_matches: dict[str, list] = {}
     for m in matches:
         group = (m.phase or "").split()[-1]
         h = row(group, m.home_team)
@@ -84,6 +86,7 @@ def _derive_from_matches(db: Session) -> list[dict]:
         if m.status != "finished" or m.home_score is None or m.away_score is None:
             continue
         hs, as_ = m.home_score, m.away_score
+        group_matches.setdefault(group, []).append((m.home_team, m.away_team, hs, as_))
         h["yellows"] += m.home_yellows or 0; h["reds"] += m.home_reds or 0
         a["yellows"] += m.away_yellows or 0; a["reds"] += m.away_reds or 0
         for r, gf, ga in ((h, hs, as_), (a, as_, hs)):
@@ -111,11 +114,16 @@ def _derive_from_matches(db: Session) -> list[dict]:
         by_group.setdefault(r["group"], []).append(r)
 
     thirds: list[dict] = []
-    # Tiebreakers: points → goal diff → goals for → fair play.
+    # Official Art. 13 within-group order (head-to-head first); across-group thirds
+    # use the overall key (points → goal diff → goals for → fair play).
     rank_key = lambda r: (r["points"], r["goal_difference"], r["goals_for"], r["fair_play"])  # noqa: E731
-    for grp in by_group.values():
-        grp.sort(key=rank_key, reverse=True)
-        for i, r in enumerate(grp):
+    for grp_letter, grp in by_group.items():
+        ordered = rank_group(
+            grp, group_matches.get(grp_letter, []),
+            name="name", points="points", gd="goal_difference", gf="goals_for", fp="fair_play",
+        )
+        by_group[grp_letter] = ordered
+        for i, r in enumerate(ordered):
             r["rank"] = i + 1
             r["qualified"] = i < 2
             r["qualifier"] = "group" if i < 2 else None
@@ -129,7 +137,8 @@ def _derive_from_matches(db: Session) -> list[dict]:
             r["qualified"] = True
             r["qualifier"] = "third"
 
-    rows.sort(key=lambda r: (r["group"], -r["points"], -r["goal_difference"], -r["goals_for"]))
+    # Output grouped by group, in the (head-to-head aware) rank order.
+    rows.sort(key=lambda r: (r["group"], r["rank"]))
     return rows
 
 

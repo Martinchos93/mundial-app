@@ -5,7 +5,7 @@ import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 import SWRProvider from "@/components/providers/SWRProvider";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 // Microsoft Clarity (heatmaps + grabaciones de sesión). Overridable via env.
 const CLARITY_ID = process.env.NEXT_PUBLIC_CLARITY_ID || "x8zh9fnw6q";
@@ -112,7 +112,7 @@ const JSON_LD = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
-      <body className={`${inter.className} bg-gray-50 text-gray-900 antialiased`}>
+      <body className={`${inter.variable} bg-gray-50 text-gray-900 antialiased`}>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}

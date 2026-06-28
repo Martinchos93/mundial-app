@@ -252,13 +252,17 @@ def fetch_and_apply(db: Session) -> dict:
         if not n0 or not n1:
             continue
 
+        # Match by team names across ANY phase (group OR knockout). A given pair
+        # plays only once in the tournament, so this is unambiguous. Knockout slots
+        # still showing placeholders ("Ganador…") don't map via URL_NAME_MAP, so
+        # only resolved knockout matchups are picked up.
         m = (
             db.query(Match)
             .filter(
-                Match.phase.ilike("Grupo %"),
                 Match.home_team.in_([n0, n1]),
                 Match.away_team.in_([n0, n1]),
             )
+            .order_by(Match.match_no.asc().nullsfirst())
             .first()
         )
         if m is None:
@@ -389,5 +393,11 @@ def fetch_and_apply(db: Session) -> dict:
             recalculate_match_scores(db, m, source="sync")
 
     db.commit()
+    # Propagate knockout winners/losers up the bracket as results come in.
+    try:
+        from app.services.bracket import resolve
+        resolve(db)
+    except Exception:  # noqa: BLE001
+        logger.exception("bracket resolve failed after promiedos sync")
     bump_matches_cache()  # scores/status/lineups/stats may have changed
     return {"enabled": True, "updated": updated, "games": len(games)}

@@ -158,9 +158,23 @@ def resolve(db: Session) -> int:
             return _winner_loser(ref)[1] if ref else None
         return None
 
+    all_groups_done = all(complete.values())
+
+    def _is_placeholder(name: str | None) -> bool:
+        return (not name) or any(t in name for t in ("°", "Ganador", "Perdedor", "Mejor"))
+
     updated = 0
     # Ascending match_no so a round's winners are set before the next references them.
     for m in knockout:
+        # A 16avos slot is fed only by group positions (W/R/T). Once every group
+        # is finished its matchup is FINAL — don't recompute it. FIFA's official
+        # best-thirds allocation can differ from our perfect matching, so a manual
+        # correction of those slots must stick (and re-resolving could undo it).
+        group_sourced = all(
+            (s or "").startswith(("W:", "R:", "T:")) for s in (m.home_source, m.away_source)
+        )
+        if group_sourced and all_groups_done and not _is_placeholder(m.home_team) and not _is_placeholder(m.away_team):
+            continue
         h = resolve_src(m.home_source, m.match_no) or label_for_source(m.home_source or "")
         a = resolve_src(m.away_source, m.match_no) or label_for_source(m.away_source or "")
         if m.home_team != h or m.away_team != a:

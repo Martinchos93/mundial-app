@@ -90,6 +90,14 @@ export default function MatchCard({ match, prediction, showPrediction, onSelect 
         <TeamSide flag={match.away_team?.flag_emoji} name={match.away_team?.short_name || match.away_team?.name} />
       </div>
 
+      {match.status === "finished" && match.home_score === match.away_score && !!match.advances && (
+        <p className="mt-1 text-center text-[10.5px] font-medium text-amber-600">
+          🥅 {(match.advances === 1 ? match.home_team : match.away_team)?.short_name ||
+            (match.advances === 1 ? match.home_team : match.away_team)?.name} avanza por penales
+          <span className="font-normal text-gray-400"> · empate para los puntos</span>
+        </p>
+      )}
+
       {showPrediction && (
         <div className="mt-2.5 flex items-center justify-between border-t border-gray-100 pt-2.5">
           {prediction ? (

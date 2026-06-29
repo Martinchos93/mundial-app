@@ -290,12 +290,21 @@ def fetch_and_apply(db: Session) -> dict:
         else:
             hs, as_, hr, ar, hg, ag = s1, s0, r1, r0, g1, g0
 
+        # Knockout qualifier (penalty shootout): promiedos `winner` is 1=team0,
+        # 2=team1. Map it to our home/away (1=home advances, 2=away). Only matters
+        # for a 120' draw — never touches the score/points.
+        _pw = _int(g.get("winner"))
+        adv = (1 if (n0 if _pw == 1 else n1) == m.home_team else 2) if _pw in (1, 2) else None
+
         # Already finalized: only FILL missing data (never overwrite a manual
         # result), then re-score so the late points land. Covers goalscorers and
         # yellows that arrived after kickoff status flipped to "finished" — e.g.
         # a 90'+ booking that Promiedos posted a beat after the final whistle.
         if m.status == "finished":
             changed_fin = False
+            if adv is not None and m.advances != adv:
+                m.advances = adv  # backfill the knockout qualifier
+                changed_fin = True
             if (hg or ag) and m.home_score == hs and m.away_score == as_:
                 fresh = (hg + ag) or None
                 total = (hs or 0) + (as_ or 0)
@@ -356,6 +365,8 @@ def fetch_and_apply(db: Session) -> dict:
             if m.home_score != hs or m.away_score != as_:
                 m.home_score, m.away_score = hs, as_
                 changed = True
+        if new_status == "finished" and adv is not None:
+            m.advances = adv  # who qualifies (relevant if 120' ended in a draw)
         if hr is not None:
             m.home_reds = hr
         if ar is not None:

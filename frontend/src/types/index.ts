@@ -113,6 +113,7 @@ export interface Match {
   events?: MatchEvent[];
   lineups?: MatchLineups | null;
   prediction_stats?: PredictionStats | null;
+  advances?: number | null; // knockout penalty qualifier: 1=home, 2=away
 }
 
 export interface PredictionStats {

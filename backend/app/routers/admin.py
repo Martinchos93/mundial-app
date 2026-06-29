@@ -392,6 +392,9 @@ class MatchResultIn(BaseModel):
     # Per-player events (goals/yellow/red), same shape as the prediction table.
     players: list[PlayerEvent] = Field(default_factory=list, max_length=60)
     finished: bool = True
+    # Knockout penalty shootout qualifier when the 120' score is a draw:
+    # 1 = home advances, 2 = away advances, None = decided by the score.
+    advances: int | None = Field(default=None, ge=1, le=2)
 
 
 @router.post("/matches/{match_id}/result")
@@ -405,6 +408,8 @@ def set_match_result(match_id: int, payload: MatchResultIn, db: Session = Depend
 
     m.home_score = payload.home_score
     m.away_score = payload.away_score
+    # Penalty qualifier only matters on a draw; clear it otherwise.
+    m.advances = payload.advances if payload.home_score == payload.away_score else None
 
     from app.models import Player
 

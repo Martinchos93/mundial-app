@@ -76,6 +76,7 @@ interface BackendMatch {
   red_players: string[] | null;
   lineups: import("@/types").MatchLineups | null;
   prediction_stats: import("@/types").PredictionStats | null;
+  advances: number | null;
 }
 
 function adaptMatch(m: BackendMatch): Match {
@@ -111,6 +112,7 @@ function adaptMatch(m: BackendMatch): Match {
     red_players: m.red_players ?? [],
     lineups: m.lineups ?? null,
     prediction_stats: m.prediction_stats ?? null,
+    advances: m.advances ?? null,
     ai_prediction: null,
     events: [],
   };
@@ -1208,6 +1210,7 @@ export interface MatchResultBody {
   away_score: number;
   players: PlayerEvent[];
   finished: boolean;
+  advances?: 1 | 2 | null; // knockout penalty qualifier on a draw (1=home, 2=away)
 }
 
 export async function setMatchResult(

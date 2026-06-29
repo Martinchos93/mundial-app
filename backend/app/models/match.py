@@ -33,6 +33,11 @@ class Match(Base):
 
     home_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
     away_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Knockout only: who advances when the 120' score is a draw (penalty shootout).
+    # 1 = home advances, 2 = away advances, NULL = decided by the score / N/A.
+    # Used ONLY by the bracket — never affects scoring (points use the 120' score,
+    # so a 2-2 that goes to pens is a DRAW for predictions).
+    advances: Mapped[int | None] = mapped_column(Integer, nullable=True)
     minute: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     home_yellows: Mapped[int] = mapped_column(Integer, default=0)

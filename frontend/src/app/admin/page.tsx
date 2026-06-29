@@ -924,16 +924,20 @@ function ResultsManager() {
   const [home, setHome] = useState(0);
   const [away, setAway] = useState(0);
   const [events, setEvents] = useState<EventMap>({});
+  const [advances, setAdvances] = useState<1 | 2 | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   const sel = matches?.find((m) => m.id === selId) ?? null;
+  const isKnockout = !!sel && !(sel.phase ?? "").startsWith("Grupo");
+  const isDraw = home === away;
 
   function select(m: Match) {
     setSelId(m.id);
     setHome(m.home_score ?? 0);
     setAway(m.away_score ?? 0);
     setEvents(matchToEvents(m));
+    setAdvances((m.advances as 1 | 2 | null) ?? null);
     setMsg(null);
   }
 
@@ -943,7 +947,10 @@ function ResultsManager() {
     setMsg(null);
     try {
       const players = Object.values(events).filter((e) => e.g || e.y || e.r);
-      const res = await setMatchResult(sel.id, { home_score: home, away_score: away, players, finished: true });
+      const res = await setMatchResult(sel.id, {
+        home_score: home, away_score: away, players, finished: true,
+        advances: isKnockout && isDraw ? advances : null,
+      });
       setMsg(`✅ ${res.score} guardado · ${res.recalculated_predictions} predicciones recalculadas`);
       await mutate();
     } catch {
@@ -1064,6 +1071,29 @@ function ResultsManager() {
               />
             </div>
           </div>
+
+          {isKnockout && isDraw && (
+            <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5">
+              <p className="mb-1.5 text-[11px] font-medium text-amber-700">
+                Empató en los 120′ → ¿quién avanza por penales? <span className="font-normal text-amber-600">(no cambia los puntos, solo el cuadro)</span>
+              </p>
+              <div className="flex gap-1.5">
+                {([1, 2] as const).map((side) => (
+                  <button
+                    key={side}
+                    type="button"
+                    onClick={() => setAdvances(advances === side ? null : side)}
+                    className={cn(
+                      "flex-1 rounded-lg border py-1.5 text-[12px] font-medium",
+                      advances === side ? "border-amber-400 bg-amber-100 text-amber-800" : "border-gray-200 text-gray-600",
+                    )}
+                  >
+                    {nm(sel, side === 1 ? "home" : "away")}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <p className="mb-1.5 text-[10px] text-gray-400">Goleadores y tarjetas (opcional, para puntuar picks por jugador):</p>
           <PlayerEventsTable

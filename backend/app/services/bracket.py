@@ -100,6 +100,11 @@ def _winner_loser(m: Match) -> tuple[str | None, str | None]:
         return m.home_team, m.away_team
     if m.away_score > m.home_score:
         return m.away_team, m.home_team
+    # Draw after 120' → decided on penalties: use the stored qualifier.
+    if m.advances == 1:
+        return m.home_team, m.away_team
+    if m.advances == 2:
+        return m.away_team, m.home_team
     return None, None  # tie without shootout info → unresolved
 
 

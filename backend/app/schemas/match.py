@@ -16,6 +16,7 @@ class MatchBase(BaseModel):
     status: str
     home_score: int | None = None
     away_score: int | None = None
+    advances: int | None = None
     minute: int | None = None
 
     model_config = {"from_attributes": True}

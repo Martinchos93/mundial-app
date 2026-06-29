@@ -381,9 +381,18 @@ def matchday1_deadline(db: Session) -> datetime | None:
 
 
 def is_topscorer_locked(db: Session) -> bool:
-    """Top-scorer + champion picks stay editable (no matchday-1 lock) so people
-    can set/fix them — and apply them to all their prodes — at any time."""
-    return False
+    """Top-scorer + champion picks lock once the tournament has KICKED OFF (the
+    first match started) — you can't change who'll be top scorer / champion after
+    games begin."""
+    first = (
+        db.query(Match)
+        .filter(Match.kickoff_utc.isnot(None))
+        .order_by(Match.kickoff_utc.asc())
+        .first()
+    )
+    if first is None:
+        return False
+    return datetime.now(timezone.utc) >= first.kickoff_utc
 
 
 def tournament_champion(db: Session) -> str | None:
